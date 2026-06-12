@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -62,6 +62,7 @@ export function PRDContentPanel({
   // scrollRef: the native scrollable div — we attach onScroll directly here
   const scrollRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const lastActiveSectionRef = useRef<string>("");
 
   const handleScroll = useCallback(() => {
     const scroll = scrollRef.current;
@@ -87,7 +88,11 @@ export function PRDContentPanel({
       }
     }
 
-    onSectionVisible(active.id.replace("section-", ""));
+    const activeSectionId = active.id.replace("section-", "");
+    if (activeSectionId !== lastActiveSectionRef.current) {
+      lastActiveSectionRef.current = activeSectionId;
+      onSectionVisible(activeSectionId);
+    }
   }, [onSectionVisible]);
 
   if (isRevising) {
@@ -121,6 +126,39 @@ export function PRDContentPanel({
     );
   }
 
+  // Memoize markdown components to avoid destroying and re-creating elements on every scroll/render
+  const markdownComponents = useMemo(
+    () => ({
+      h1: ({ children, ...props }: any) => (
+        <HeadingWithId level={1} {...props}>
+          {children}
+        </HeadingWithId>
+      ),
+      h2: ({ children, ...props }: any) => (
+        <HeadingWithId level={2} {...props}>
+          {children}
+        </HeadingWithId>
+      ),
+      h3: ({ children, ...props }: any) => (
+        <HeadingWithId level={3} {...props}>
+          {children}
+        </HeadingWithId>
+      ),
+      code({ className, children, ...rest }: any) {
+        const lang = /language-(\w+)/.exec(className ?? "")?.[1];
+        if (lang === "mermaid") {
+          return <MermaidDiagram chart={String(children).replace(/\n$/, "")} />;
+        }
+        return (
+          <code className={className} {...rest}>
+            {children}
+          </code>
+        );
+      },
+    }),
+    []
+  );
+
   return (
     <main className="flex-1 min-h-0 overflow-hidden flex flex-col bg-background">
       {/*
@@ -141,40 +179,7 @@ export function PRDContentPanel({
             <div className="prd-content">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
-                components={{
-                  h1: ({ children, ...props }) => (
-                    <HeadingWithId level={1} {...props}>
-                      {children}
-                    </HeadingWithId>
-                  ),
-                  h2: ({ children, ...props }) => (
-                    <HeadingWithId level={2} {...props}>
-                      {children}
-                    </HeadingWithId>
-                  ),
-                  h3: ({ children, ...props }) => (
-                    <HeadingWithId level={3} {...props}>
-                      {children}
-                    </HeadingWithId>
-                  ),
-                  // Intercept ```mermaid fenced blocks and render as diagram
-                  code({ className, children, ...rest }) {
-                    const lang = /language-(\w+)/.exec(className ?? "")?.[1];
-                    if (lang === "mermaid") {
-                      return (
-                        <MermaidDiagram
-                          chart={String(children).replace(/\n$/, "")}
-                        />
-                      );
-                    }
-                    // Regular code block
-                    return (
-                      <code className={className} {...rest}>
-                        {children}
-                      </code>
-                    );
-                  },
-                }}
+                components={markdownComponents}
               >
                 {content}
               </ReactMarkdown>
