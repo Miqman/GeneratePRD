@@ -16,7 +16,7 @@ const anthropicProvider: AIProvider = {
       },
       body: JSON.stringify({
         model: process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-20241022",
-        max_tokens: 4096,
+        max_tokens: 8192,
         system: PRD_SYSTEM_PROMPT(language),
         messages: [{ role: "user", content: prompt }],
       }),
@@ -45,7 +45,7 @@ const anthropicProvider: AIProvider = {
       },
       body: JSON.stringify({
         model: process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-20241022",
-        max_tokens: 4096,
+        max_tokens: 8192,
         system: REVISE_SYSTEM_PROMPT(language),
         messages: [
           {

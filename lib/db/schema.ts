@@ -10,8 +10,8 @@ export const users = pgTable("users", {
   name: text("name"),
   emailVerified: boolean("email_verified").default(false).notNull(),
   image: text("image"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const prdSessions = pgTable("prd_sessions", {
@@ -22,8 +22,8 @@ export const prdSessions = pgTable("prd_sessions", {
   title: text("title").notNull(),
   prompt: text("prompt").notNull(),
   language: text("language").notNull().default("id"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const prdVersions = pgTable("prd_versions", {
@@ -34,7 +34,7 @@ export const prdVersions = pgTable("prd_versions", {
   versionNumber: integer("version_number").notNull(),
   content: text("content").notNull(),
   changeDescription: text("change_description"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const chatMessages = pgTable("chat_messages", {
@@ -44,7 +44,7 @@ export const chatMessages = pgTable("chat_messages", {
     .references(() => prdSessions.id, { onDelete: "cascade" }),
   role: text("role").notNull(), // 'user' | 'assistant'
   content: text("content").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 // ============================================================

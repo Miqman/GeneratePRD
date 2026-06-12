@@ -20,7 +20,7 @@ const openaiProvider: AIProvider = {
           { role: "user", content: prompt },
         ],
         temperature: 0.7,
-        max_tokens: 4096,
+        max_tokens: 8192,
       }),
     });
 
@@ -54,7 +54,7 @@ const openaiProvider: AIProvider = {
           },
         ],
         temperature: 0.7,
-        max_tokens: 4096,
+        max_tokens: 8192,
       }),
     });
 

@@ -12,7 +12,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileText, Plus, Trash2, Clock } from "lucide-react";
+import { FileText, Plus, Trash2, Clock, X } from "lucide-react";
 import type { PRDSession } from "@/lib/types";
 import { formatDistanceToNow } from "@/lib/utils-date";
 
@@ -61,11 +61,18 @@ export function Sidebar({ open, onClose }: SidebarProps) {
     <Sheet open={open} onOpenChange={onClose}>
       <SheetContent
         side="left"
+        showCloseButton={false}
         className="w-72 bg-card border-border p-0 flex flex-col"
       >
         <SheetHeader className="px-4 py-4 border-b border-border/50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
+              <button
+                onClick={onClose}
+                className="p-1 rounded-md hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
               <SheetTitle className="text-sm font-extrabold text-foreground tracking-tight">
                 prd<span className="text-primary">forge</span>.ai
               </SheetTitle>
@@ -141,7 +148,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                               <div className="flex items-center gap-1.5 mt-1">
                                 <Clock className="w-2.5 h-2.5 text-muted-foreground/50" />
                                 <span className="text-muted-foreground/50 text-[10px]">
-                                  {formatDistanceToNow(new Date(session.updatedAt))}
+                                  {formatDistanceToNow(new Date(session.createdAt))}
                                 </span>
                                 {session.versions && session.versions.length > 1 && (
                                   <Badge
@@ -183,7 +190,7 @@ function groupByDate(sessions: PRDSession[]): Record<string, PRDSession[]> {
   const groups: Record<string, PRDSession[]> = {};
 
   for (const s of sessions) {
-    const d = new Date(s.updatedAt);
+    const d = new Date(s.createdAt);
     const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
 
     let label: string;
