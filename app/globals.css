@@ -1,0 +1,393 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+    --font-heading: var(--font-manrope), sans-serif;
+    --font-sans: var(--font-manrope), sans-serif;
+    --font-mono: var(--font-jetbrains), monospace;
+
+    /* Custom font families matching user request */
+    --font-body-md: var(--font-manrope), sans-serif;
+    --font-label-md: var(--font-jetbrains), monospace;
+    --font-body-sm: var(--font-manrope), sans-serif;
+    --font-body-lg: var(--font-manrope), sans-serif;
+    --font-headline-lg-mobile: var(--font-manrope), sans-serif;
+    --font-headline-xl: var(--font-manrope), sans-serif;
+    --font-headline-lg: var(--font-manrope), sans-serif;
+    --font-label-sm: var(--font-jetbrains), monospace;
+
+    /* Spacing variables from HTML config */
+    --spacing-gutter: 1.5rem;
+    --spacing-stack-lg: 2rem;
+    --spacing-stack-md: 1rem;
+    --spacing-section-gap: 3rem;
+    --spacing-stack-sm: 0.5rem;
+    --spacing-container-max: 768px;
+    --width-container-max: 768px;
+    --max-width-container-max: 768px;
+
+    /* Border Radius from HTML config */
+    --radius-default: 0.25rem;
+    --radius-lg: 0.5rem;
+    --radius-xl: 0.75rem;
+    --radius-full: 9999px;
+
+    /* Colors from HTML config */
+    --color-on-tertiary-container: #3f4858;
+    --color-surface-variant: #2e3541;
+    --color-on-primary-fixed-variant: #005224;
+    --color-surface-container-highest: #2e3541;
+    --color-on-surface-variant: #bccaba;
+    --color-inverse-surface: #dce3f2;
+    --color-secondary-fixed: #ffddb8;
+    --color-secondary: #ffb95f;
+    --color-primary: #5eed89;
+    --color-tertiary-fixed: #dae3f7;
+    --color-surface-tint: #50e07e;
+    --color-surface-container-high: #232a35;
+    --color-error-container: #93000a;
+    --color-surface-dim: #0d141e;
+    --color-on-secondary-fixed: #2a1700;
+    --color-on-surface: #dce3f2;
+    --color-surface: #0d141e;
+    --color-outline: #869486;
+    --color-inverse-primary: #006d33;
+    --color-on-background: #dce3f2;
+    --color-primary-fixed: #6ffe98;
+    --color-text-primary: #f3f4f6;
+    --color-on-error: #690005;
+    --color-tertiary-container: #aeb7ca;
+    --color-surface-bright: #333a45;
+    --color-on-error-container: #ffdad6;
+    --color-background: #0d141e;
+    --color-secondary-fixed-dim: #ffb95f;
+    --color-tertiary-fixed-dim: #bec7da;
+    --color-surface-container-low: #151c27;
+    --color-border-subtle: #374151;
+    --color-outline-variant: #3d4a3e;
+    --color-on-secondary-container: #5b3800;
+    --color-error: #ffb4ab;
+    --color-on-secondary: #472a00;
+    --color-on-tertiary: #283140;
+    --color-on-tertiary-fixed-variant: #3e4757;
+    --color-text-secondary: #9ca3af;
+    --color-surface-container-lowest: #070e19;
+    --color-primary-fixed-dim: #50e07e;
+    --color-on-primary-container: #005425;
+    --color-inverse-on-surface: #2a313c;
+    --color-on-primary: #003917;
+    --color-tertiary: #cad3e6;
+    --color-on-secondary-fixed-variant: #653e00;
+    --color-primary-container: #3cd070;
+    --color-surface-container: #19202b;
+    --color-on-tertiary-fixed: #131c2a;
+    --color-on-primary-fixed: #00210b;
+    --color-secondary-container: #ee9800;
+
+    /* Shadcn color mappings to variables */
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+
+    --color-sidebar: var(--sidebar);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/* ============================================================
+   DARK THEME — always active
+   ============================================================ */
+:root, .dark {
+    --background: #0d141e;
+    --foreground: #f3f4f6;
+    --card: #151c27;
+    --card-foreground: #dce3f2;
+    --popover: #151c27;
+    --popover-foreground: #dce3f2;
+    --primary: #5eed89;
+    --primary-foreground: #003917;
+    --secondary: #ffb95f;
+    --secondary-foreground: #472a00;
+    --muted: #232a35;
+    --muted-foreground: #9ca3af;
+    --accent: #19202b;
+    --accent-foreground: #f3f4f6;
+    --destructive: #ffb4ab;
+    --destructive-foreground: #690005;
+    --border: #374151;
+    --input: #374151;
+    --ring: #5eed89;
+    --radius: 0.25rem;
+
+    --sidebar: #0d141e;
+    --sidebar-foreground: #dce3f2;
+    --sidebar-primary: #5eed89;
+    --sidebar-primary-foreground: #003917;
+    --sidebar-accent: #19202b;
+    --sidebar-accent-foreground: #f3f4f6;
+    --sidebar-border: #374151;
+    --sidebar-ring: #5eed89;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+/* ============================================================
+   CUSTOM SCROLLBAR — slim, sleek, auto-fading
+   ============================================================ */
+
+/* Firefox */
+* { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+*:hover { scrollbar-color: #2e3748 transparent; }
+
+/* WebKit (Chrome, Safari, Edge) */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 99px;
+  transition: background 0.3s ease;
+}
+/* Show thumb only when hovering the scrollable container */
+*:hover::-webkit-scrollbar-thumb { background: rgba(55, 65, 81, 0.6); }
+*:hover::-webkit-scrollbar-thumb:hover { background: rgba(94, 237, 137, 0.35); }
+
+/* PRD Content Panel — slightly more visible, smooth auto-hide */
+.prd-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.3s ease;
+}
+.prd-scroll:hover {
+  scrollbar-color: rgba(55, 65, 81, 0.7) transparent;
+}
+.prd-scroll::-webkit-scrollbar { width: 4px; }
+.prd-scroll::-webkit-scrollbar-track { background: transparent; }
+.prd-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 99px;
+  transition: background 0.4s ease;
+}
+.prd-scroll:hover::-webkit-scrollbar-thumb {
+  background: rgba(55, 65, 81, 0.65);
+}
+.prd-scroll:hover::-webkit-scrollbar-thumb:hover {
+  background: rgba(94, 237, 137, 0.4);
+}
+
+/* ============================================================
+   PRD MARKDOWN CONTENT STYLES
+   ============================================================ */
+.prd-content {
+  font-size: 0.9375rem;
+  line-height: 1.75;
+}
+
+.prd-content h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #f3f4f6;
+  margin-bottom: 1rem;
+  margin-top: 0;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #374151;
+}
+
+.prd-content h2 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #f3f4f6;
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+  scroll-margin-top: 5rem;
+}
+
+.prd-content h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #cad3e6;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.prd-content p { margin-bottom: 0.85rem; }
+.prd-content ul, .prd-content ol { padding-left: 1.5rem; margin-bottom: 0.85rem; }
+.prd-content li { margin-bottom: 0.35rem; }
+.prd-content strong { font-weight: 600; color: #f3f4f6; }
+
+.prd-content code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: #232a35;
+  border: 1px solid #374151;
+  border-radius: 0.25rem;
+  padding: 0.125rem 0.375rem;
+  color: #5eed89;
+}
+
+.prd-content pre {
+  background: #070e19;
+  border: 1px solid #374151;
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+
+.prd-content pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 0.8125rem;
+  color: #cad3e6;
+}
+
+.prd-content blockquote {
+  border-left: 3px solid #5eed89;
+  padding: 0.75rem 1rem;
+  margin: 1rem 0;
+  color: #9ca3af;
+  background: rgba(94, 237, 137, 0.06);
+  border-radius: 0 0.375rem 0.375rem 0;
+}
+
+.prd-content table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.875rem; }
+.prd-content th {
+  background: rgba(94, 237, 137, 0.15);
+  color: #5eed89;
+  font-weight: 600;
+  text-align: left;
+  padding: 0.625rem 0.875rem;
+  border-bottom: 1px solid rgba(94, 237, 137, 0.3);
+}
+.prd-content td {
+  padding: 0.5rem 0.875rem;
+  border-bottom: 1px solid #374151;
+  vertical-align: top;
+}
+.prd-content tr:last-child td { border-bottom: none; }
+.prd-content tr:hover td { background: #19202b; }
+.prd-content hr { border: none; border-top: 1px solid #374151; margin: 1.75rem 0; }
+
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
+@keyframes fade-in-up {
+  from { transform: translateY(12px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+@keyframes typing {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30%            { transform: translateY(-4px); opacity: 1; }
+}
+
+.animate-fade-in-up { animation: fade-in-up 0.35s ease forwards; }
+.animate-typing-dot:nth-child(1) { animation: typing 1.2s ease infinite 0s; }
+.animate-typing-dot:nth-child(2) { animation: typing 1.2s ease infinite 0.2s; }
+.animate-typing-dot:nth-child(3) { animation: typing 1.2s ease infinite 0.4s; }
+
+/* ============================================================
+   CUSTOM FONT & SIZE UTILITIES (Tailwind v4)
+   ============================================================ */
+@utility text-body-md {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+}
+@utility text-label-md {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+}
+@utility text-body-sm {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+}
+@utility text-body-lg {
+  font-size: 18px;
+  line-height: 28px;
+  font-weight: 400;
+}
+@utility text-headline-lg-mobile {
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 700;
+}
+@utility text-headline-xl {
+  font-size: 40px;
+  line-height: 48px;
+  letter-spacing: -0.02em;
+  font-weight: 800;
+}
+@utility text-headline-lg {
+  font-size: 32px;
+  line-height: 40px;
+  letter-spacing: -0.01em;
+  font-weight: 700;
+}
+@utility text-label-sm {
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0.02em;
+  font-weight: 500;
+}
+
+@utility font-body-md {
+  font-family: var(--font-body-md);
+}
+@utility font-label-md {
+  font-family: var(--font-label-md);
+}
+@utility font-body-sm {
+  font-family: var(--font-body-sm);
+}
+@utility font-body-lg {
+  font-family: var(--font-body-lg);
+}
+@utility font-headline-lg-mobile {
+  font-family: var(--font-headline-lg-mobile);
+}
+@utility font-headline-xl {
+  font-family: var(--font-headline-xl);
+}
+@utility font-headline-lg {
+  font-family: var(--font-headline-lg);
+}
+@utility font-label-sm {
+  font-family: var(--font-label-sm);
+}
