@@ -1,5 +1,4 @@
 import type { AIProvider } from "./provider";
-import { PRD_SYSTEM_PROMPT, REVISE_SYSTEM_PROMPT } from "@/lib/prd-prompt";
 
 // ============================================================
 // Mock AI Provider — realistic PRD output for testing
@@ -317,6 +316,63 @@ const mockProvider: AIProvider = {
     // Simulate AI delay
     await new Promise((resolve) => setTimeout(resolve, 1000));
     return generateMockRevision(currentPRD, instruction);
+  },
+
+  async chatPRD(
+    _currentPRD: string,
+    message: string,
+    language: "id" | "en"
+  ): Promise<string> {
+    // Simulate AI delay
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    const isId = language === "id";
+
+    // Simple keyword-based intent detection for mock
+    const revisionKeywords = [
+      "ubah", "ganti", "tambahkan", "hapus", "perbaiki", "rubah", "modifikasi",
+      "jangan pakai", "lebih baik", "seharusnya", "harusnya", "pakai saja",
+      "change", "add", "remove", "modify", "update", "improve", "replace", "delete",
+      "should use", "don't use", "instead of", "prefer",
+    ];
+    const lowerMsg = message.toLowerCase();
+    const wantsRevision = revisionKeywords.some((kw) => lowerMsg.includes(kw));
+
+    if (wantsRevision) {
+      return JSON.stringify({
+        action: "revision",
+        response: isId
+          ? `Oke, saya akan mengubah PRD sesuai permintaanmu: **${message.slice(0, 80)}**. Klik tombol di bawah untuk menerapkan perubahan.`
+          : `OK, I'll update the PRD according to your request: **${message.slice(0, 80)}**. Click the button below to apply the changes.`,
+        revisionInstruction: message,
+        revisionSummary: message.slice(0, 50),
+      });
+    }
+
+    return JSON.stringify({
+      action: "discussion",
+      response: isId
+        ? `Pertanyaan yang bagus! Berdasarkan PRD saat ini, berikut penjelasan mengenai **${message.slice(0, 60)}**:\n\nKeputusan ini diambil berdasarkan best practice industri dan kebutuhan yang telah didefinisikan di bagian Requirements. Jika kamu ingin mengubahnya, silakan instruksikan secara eksplisit (misalnya: "ubah tech stack menjadi X").`
+        : `Great question! Based on the current PRD, here's the reasoning behind **${message.slice(0, 60)}**:\n\nThis decision is based on industry best practices and the requirements defined in the Requirements section. If you'd like to change it, please instruct explicitly (e.g., "change the tech stack to X").`,
+    });
+  },
+
+  async chatPRDStream(
+    _currentPRD: string,
+    message: string,
+    language: "id" | "en"
+  ): Promise<ReadableStream<string>> {
+    // Get the non-streaming response and return as a single-chunk stream
+    // The route handler handles the typing effect for the client
+    const rawJson = await mockProvider.chatPRD(_currentPRD, message, language);
+    const parsed = JSON.parse(rawJson);
+    const responseJson = JSON.stringify(parsed);
+
+    return new ReadableStream<string>({
+      start(controller) {
+        controller.enqueue(responseJson);
+        controller.close();
+      },
+    });
   },
 
   async clarify(prompt: string, language: "id" | "en"): Promise<string> {

@@ -51,14 +51,6 @@ export async function POST(
       return NextResponse.json({ error: "Versi PRD tidak ditemukan" }, { status: 404 });
     }
 
-    // Save user message
-    await db.insert(chatMessages).values({
-      id: nanoid(),
-      sessionId: id,
-      role: "user",
-      content: instruction,
-    });
-
     // Revise PRD via AI
     const aiProvider = await getAIProvider();
     const revisedContent = await aiProvider.revisePRD(
@@ -76,15 +68,15 @@ export async function POST(
       sessionId: id,
       versionNumber: newVersionNumber,
       content: revisedContent,
-      changeDescription: instruction.slice(0, 100),
+      changeDescription: `Revisi dari chat`,
     });
 
-    // Save assistant message
+    // Save assistant confirmation message (no detailed summary)
     await db.insert(chatMessages).values({
       id: nanoid(),
       sessionId: id,
       role: "assistant",
-      content: `PRD telah diperbarui ke **Version ${newVersionNumber}**. Perubahan: ${instruction.slice(0, 100)}`,
+      content: `PRD telah diperbarui ke **Version ${newVersionNumber}**. Perubahan berhasil diterapkan!`,
     });
 
     // Update session updatedAt

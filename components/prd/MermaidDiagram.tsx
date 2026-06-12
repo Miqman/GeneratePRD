@@ -8,6 +8,31 @@ interface MermaidDiagramProps {
 
 let mermaidInitialized = false;
 
+/** Reserved words in Mermaid erDiagram that cause parse errors when used as attribute names */
+const MERMAID_ERD_RESERVED = new Set([
+  "type", "end", "direction", "link", "style", "class",
+]);
+
+/** Sanitize erDiagram syntax to avoid Mermaid parse errors */
+function sanitizeMermaidChart(chart: string): string {
+  return chart
+    .split("\n")
+    .map((line) => {
+      const trimmed = line.trim();
+      // Match erDiagram attribute lines: "datatype name [PK|FK|...]"
+      const match = trimmed.match(/^(\w+)\s+(\w+)(\s+(?:PK|FK|UK|PF).*)?$/);
+      if (match) {
+        const [, dataType, attrName, rest] = match;
+        if (MERMAID_ERD_RESERVED.has(attrName.toLowerCase())) {
+          const indent = line.match(/^(\s*)/)?.[1] || "";
+          return `${indent}${dataType} ${attrName}_name${rest || ""}`;
+        }
+      }
+      return line;
+    })
+    .join("\n");
+}
+
 export function MermaidDiagram({ chart }: MermaidDiagramProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +82,8 @@ export function MermaidDiagram({ chart }: MermaidDiagramProps) {
         }
 
         const id = `mermaid-${Math.random().toString(36).slice(2)}`;
-        const { svg: renderedSvg } = await mermaid.render(id, chart.trim());
+        const sanitizedChart = sanitizeMermaidChart(chart.trim());
+        const { svg: renderedSvg } = await mermaid.render(id, sanitizedChart);
         if (!cancelled) {
           setSvg(renderedSvg);
           setError(null);

@@ -41,6 +41,7 @@ export default function PRDEditorPage({
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRevising, setIsRevising] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("preview");
   const [copied, setCopied] = useState(false);
   const [activeSection, setActiveSection] = useState("overview");
@@ -59,7 +60,11 @@ export default function PRDEditorPage({
       setSession(s);
       setCurrentVersion(s.versions?.[0] || null);
       setChatMessages(
-        (s.messages || []).slice().reverse()
+        (s.messages || []).slice().reverse().map((m: ChatMessage & { metadata?: { action?: string; revisionProposal?: { instruction: string; summary: string }; revisionApplied?: boolean } }) => ({
+          ...m,
+          revisionProposal: m.metadata?.revisionProposal || undefined,
+          revisionApplied: m.metadata?.revisionApplied || false,
+        }))
       );
     } catch {
       router.push("/");
@@ -76,19 +81,134 @@ export default function PRDEditorPage({
     setCurrentVersion(version);
   };
 
-  const handleRevise = async (instruction: string) => {
-    if (!instruction.trim() || isRevising) return;
-    setIsRevising(true);
+  const handleChat = async (message: string) => {
+    if (!message.trim() || isRevising || isStreaming) return;
+    setIsStreaming(true);
 
     // Optimistic: add user message
     const tempUserMsg: ChatMessage = {
       id: `temp-${Date.now()}`,
       sessionId: id,
       role: "user",
-      content: instruction,
+      content: message,
       createdAt: new Date().toISOString(),
     };
     setChatMessages((prev) => [...prev, tempUserMsg]);
+
+    // Create a placeholder for the streaming assistant message
+    const streamingMsgId = `stream-${Date.now()}`;
+    const streamingMsg: ChatMessage = {
+      id: streamingMsgId,
+      sessionId: id,
+      role: "assistant",
+      content: "",
+      createdAt: new Date().toISOString(),
+    };
+    setChatMessages((prev) => [...prev, streamingMsg]);
+
+    try {
+      const res = await fetch(`/api/prd/${id}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message }),
+      });
+
+      if (!res.ok) throw new Error("Chat failed");
+      if (!res.body) throw new Error("No response body");
+
+      // Read SSE stream
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let userMsgId = tempUserMsg.id;
+      let accumulatedText = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        // Parse SSE events (separated by \n\n)
+        const events = buffer.split("\n\n");
+        buffer = events.pop() || ""; // keep incomplete event
+
+        for (const eventBlock of events) {
+          const lines = eventBlock.split("\n");
+          let eventType = "";
+          let eventData = "";
+
+          for (const line of lines) {
+            if (line.startsWith("event: ")) eventType = line.slice(7).trim();
+            else if (line.startsWith("data: ")) eventData = line.slice(6);
+          }
+
+          if (!eventType || !eventData) continue;
+
+          try {
+            const data = JSON.parse(eventData);
+
+            if (eventType === "start") {
+              // Replace temp user msg ID with real one
+              userMsgId = data.userMessageId;
+            } else if (eventType === "text") {
+              accumulatedText += data.text;
+              setChatMessages((prev) =>
+                prev.map((m) =>
+                  m.id === streamingMsgId
+                    ? { ...m, content: accumulatedText }
+                    : m.id === tempUserMsg.id
+                    ? { ...m, id: userMsgId }
+                    : m
+                )
+              );
+            } else if (eventType === "done") {
+              // Finalize the assistant message
+              setChatMessages((prev) =>
+                prev.map((m) =>
+                  m.id === streamingMsgId
+                    ? {
+                        ...m,
+                        id: data.assistantMessageId,
+                        content: accumulatedText || m.content,
+                        revisionProposal: data.revisionProposal || undefined,
+                      }
+                    : m
+                )
+              );
+            } else if (eventType === "error") {
+              throw new Error(data.message || "Stream error");
+            }
+          } catch (parseErr) {
+            // If it's an error from the "error" event, re-throw
+            if (eventType === "error") throw parseErr;
+            // Otherwise skip malformed events
+          }
+        }
+      }
+    } catch {
+      toast.error("Gagal memproses pesan. Silakan coba lagi.");
+      // Remove temp messages
+      setChatMessages((prev) =>
+        prev.filter((m) => m.id !== tempUserMsg.id && m.id !== streamingMsgId)
+      );
+    } finally {
+      setIsStreaming(false);
+    }
+  };
+
+  const handleApplyRevision = async (
+    instruction: string,
+    messageId: string
+  ) => {
+    if (!instruction.trim() || isRevising || isStreaming) return;
+    setIsRevising(true);
+
+    // Mark proposal as applied in UI
+    setChatMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId ? { ...m, revisionApplied: true } : m
+      )
+    );
 
     try {
       const res = await fetch(`/api/prd/${id}/revise`, {
@@ -105,7 +225,7 @@ export default function PRDEditorPage({
         sessionId: id,
         versionNumber: data.versionNumber,
         content: data.content,
-        changeDescription: instruction.slice(0, 100),
+        changeDescription: `Revisi dari chat`,
         createdAt: new Date().toISOString(),
       };
 
@@ -119,19 +239,24 @@ export default function PRDEditorPage({
           : prev
       );
 
-      // Add AI response message
-      const aiMsg: ChatMessage = {
-        id: `ai-${Date.now()}`,
+      // Add confirmation message
+      const confirmMsg: ChatMessage = {
+        id: `confirm-${Date.now()}`,
         sessionId: id,
         role: "assistant",
-        content: `PRD diperbarui ke **Version ${data.versionNumber}**. Perubahan diterapkan sesuai instruksimu.`,
+        content: `PRD diperbarui ke **Version ${data.versionNumber}**. Perubahan berhasil diterapkan!`,
         createdAt: new Date().toISOString(),
       };
-      setChatMessages((prev) => [...prev, aiMsg]);
+      setChatMessages((prev) => [...prev, confirmMsg]);
       toast.success(`PRD diperbarui ke Version ${data.versionNumber}`);
     } catch {
       toast.error("Gagal merevisi PRD. Silakan coba lagi.");
-      setChatMessages((prev) => prev.filter((m) => m.id !== tempUserMsg.id));
+      // Revert applied state
+      setChatMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId ? { ...m, revisionApplied: false } : m
+        )
+      );
     } finally {
       setIsRevising(false);
     }
@@ -328,8 +453,10 @@ export default function PRDEditorPage({
         {/* RIGHT: Chat revision */}
         <PRDChatPanel
           messages={chatMessages}
-          onRevise={handleRevise}
+          onChat={handleChat}
+          onApplyRevision={handleApplyRevision}
           isRevising={isRevising}
+          isStreaming={isStreaming}
         />
       </div>
     </div>

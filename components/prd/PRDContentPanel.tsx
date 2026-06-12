@@ -95,37 +95,6 @@ export function PRDContentPanel({
     }
   }, [onSectionVisible]);
 
-  if (isRevising) {
-    return (
-      <main className="flex-1 min-h-0 overflow-hidden flex flex-col">
-        <ScrollArea className="flex-1 h-full">
-          <div className="max-w-3xl mx-auto px-8 py-8 space-y-4">
-            <div className="flex items-center gap-3 py-4 px-5 rounded-xl bg-primary/8 border border-primary/20 mb-6">
-              <div className="flex gap-1">
-                <span className="w-2 h-2 rounded-full bg-primary animate-typing-dot" />
-                <span className="w-2 h-2 rounded-full bg-primary animate-typing-dot" />
-                <span className="w-2 h-2 rounded-full bg-primary animate-typing-dot" />
-              </div>
-              <span className="text-sm text-muted-foreground">
-                AI sedang merevisi PRD...
-              </span>
-            </div>
-            <Skeleton className="h-8 w-3/4 bg-muted/50" />
-            <Skeleton className="h-4 w-full bg-muted/30" />
-            <Skeleton className="h-4 w-5/6 bg-muted/30" />
-            <Skeleton className="h-4 w-4/5 bg-muted/30" />
-            <div className="pt-4">
-              <Skeleton className="h-6 w-1/3 bg-muted/50 mb-3" />
-              <Skeleton className="h-4 w-full bg-muted/30" />
-              <Skeleton className="h-4 w-11/12 bg-muted/30 mt-2" />
-              <Skeleton className="h-4 w-4/5 bg-muted/30 mt-2" />
-            </div>
-          </div>
-        </ScrollArea>
-      </main>
-    );
-  }
-
   // Memoize markdown components to avoid destroying and re-creating elements on every scroll/render
   const markdownComponents = useMemo(
     () => ({
@@ -158,6 +127,37 @@ export function PRDContentPanel({
     }),
     []
   );
+
+  if (isRevising) {
+    return (
+      <main className="flex-1 min-h-0 overflow-hidden flex flex-col">
+        <ScrollArea className="flex-1 h-full">
+          <div className="max-w-3xl mx-auto px-8 py-8 space-y-4">
+            <div className="flex items-center gap-3 py-4 px-5 rounded-xl bg-primary/8 border border-primary/20 mb-6">
+              <div className="flex gap-1">
+                <span className="w-2 h-2 rounded-full bg-primary animate-typing-dot" />
+                <span className="w-2 h-2 rounded-full bg-primary animate-typing-dot" />
+                <span className="w-2 h-2 rounded-full bg-primary animate-typing-dot" />
+              </div>
+              <span className="text-sm text-muted-foreground">
+                AI sedang merevisi PRD...
+              </span>
+            </div>
+            <Skeleton className="h-8 w-3/4 bg-muted/50" />
+            <Skeleton className="h-4 w-full bg-muted/30" />
+            <Skeleton className="h-4 w-5/6 bg-muted/30" />
+            <Skeleton className="h-4 w-4/5 bg-muted/30" />
+            <div className="pt-4">
+              <Skeleton className="h-6 w-1/3 bg-muted/50 mb-3" />
+              <Skeleton className="h-4 w-full bg-muted/30" />
+              <Skeleton className="h-4 w-11/12 bg-muted/30 mt-2" />
+              <Skeleton className="h-4 w-4/5 bg-muted/30 mt-2" />
+            </div>
+          </div>
+        </ScrollArea>
+      </main>
+    );
+  }
 
   return (
     <main className="flex-1 min-h-0 overflow-hidden flex flex-col bg-background">

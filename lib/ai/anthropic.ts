@@ -1,4 +1,5 @@
 import type { AIProvider } from "./provider";
+import { truncatePRDForChat } from "./provider";
 
 // ============================================================
 // Anthropic Claude Adapter — aktif saat AI_PROVIDER=anthropic
@@ -63,6 +64,104 @@ const anthropicProvider: AIProvider = {
     const data = await response.json();
     return data.content[0].text;
   },
+
+  async chatPRD(
+    currentPRD: string,
+    message: string,
+    language: "id" | "en"
+  ): Promise<string> {
+    const { CHAT_SYSTEM_PROMPT } = await import("@/lib/prd-prompt");
+    const truncatedPRD = truncatePRDForChat(currentPRD);
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": process.env.ANTHROPIC_API_KEY!,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-20241022",
+        max_tokens: 1024,
+        system: CHAT_SYSTEM_PROMPT(language),
+        messages: [
+          {
+            role: "user",
+            content: `Current PRD:\n\n${truncatedPRD}\n\n---\n\nUser message: ${message}`,
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Anthropic API error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.content[0].text;
+  },
+
+  async chatPRDStream(
+    currentPRD: string,
+    message: string,
+    language: "id" | "en"
+  ): Promise<ReadableStream<string>> {
+    const { CHAT_SYSTEM_PROMPT } = await import("@/lib/prd-prompt");
+    const truncatedPRD = truncatePRDForChat(currentPRD);
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": process.env.ANTHROPIC_API_KEY!,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-20241022",
+        max_tokens: 1024,
+        system: CHAT_SYSTEM_PROMPT(language),
+        messages: [
+          {
+            role: "user",
+            content: `Current PRD:\n\n${truncatedPRD}\n\n---\n\nUser message: ${message}`,
+          },
+        ],
+        stream: true,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Anthropic API error: ${response.statusText}`);
+    }
+
+    // Parse Anthropic SSE stream (content_block_delta events)
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    return new ReadableStream<string>({
+      async pull(controller) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) { controller.close(); return; }
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+          for (const line of lines) {
+            const t = line.trim();
+            if (!t.startsWith("data: ")) continue;
+            try {
+              const p = JSON.parse(t.slice(6));
+              if (p.type === "content_block_delta" && p.delta?.text) {
+                controller.enqueue(p.delta.text);
+                return;
+              }
+              if (p.type === "message_stop") { controller.close(); return; }
+            } catch { /* skip */ }
+          }
+        }
+      },
+    });
+  },
+
   async clarify(prompt: string, language: "id" | "en"): Promise<string> {
     const { CLARIFY_SYSTEM_PROMPT } = await import("@/lib/prd-prompt");
     const response = await fetch("https://api.anthropic.com/v1/messages", {

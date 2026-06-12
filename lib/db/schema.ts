@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, integer, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, integer, boolean, jsonb } from "drizzle-orm/pg-core";
 
 // ============================================================
 // APP TABLES
@@ -44,6 +44,7 @@ export const chatMessages = pgTable("chat_messages", {
     .references(() => prdSessions.id, { onDelete: "cascade" }),
   role: text("role").notNull(), // 'user' | 'assistant'
   content: text("content").notNull(),
+  metadata: jsonb("metadata"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
