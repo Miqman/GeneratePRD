@@ -27,6 +27,12 @@ import { Sidebar } from "@/components/layout/Sidebar";
 
 type PageState = "idle" | "clarifying" | "generating";
 
+type Question = {
+  text: string;
+  type: "open" | "choice";
+  choices?: string[];
+};
+
 export default function LandingPage() {
   const router = useRouter();
   const { data: session, isPending } = useSession();
@@ -37,7 +43,7 @@ export default function LandingPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Clarification state
-  const [questions, setQuestions] = useState<string[]>([]);
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -72,7 +78,10 @@ export default function LandingPage() {
 
       if (data.needsClarification && data.questions?.length > 0) {
         // Show questions
-        setQuestions(data.questions);
+        const formattedQuestions: Question[] = data.questions.map((q: any) =>
+          typeof q === "string" ? { text: q, type: "open" } : q
+        );
+        setQuestions(formattedQuestions);
         setAnswers({});
         setPageState("clarifying");
       } else {
@@ -279,7 +288,7 @@ export default function LandingPage() {
               <div>
                 <p className="text-body-md font-semibold text-on-surface">Boleh saya tanya dulu?</p>
                 <p className="text-label-sm text-text-secondary mt-0.5">
-                  Jawaban ini membantu AI membuat PRD yang lebih akurat. Boleh dilewati.
+                  Jawaban ini membantu AI membuat PRD yang lebih akurat. <strong className="text-primary/80 font-medium">Jawab yang menurut Anda penting saja, tidak perlu semua.</strong>
                 </p>
               </div>
             </div>
@@ -290,36 +299,60 @@ export default function LandingPage() {
             </div>
 
             {/* Questions */}
-            <div className="space-y-4">
-              {questions.map((q, i) => (
-                <div key={i} className="flex flex-col gap-1.5">
-                  <label
-                    htmlFor={`clarify-q-${i}`}
-                    className="text-label-sm font-medium text-text-primary flex items-center gap-2"
-                  >
-                    <span className="w-5 h-5 rounded-full bg-primary/15 text-primary text-xs flex items-center justify-center font-bold shrink-0">
-                      {i + 1}
-                    </span>
-                    {q}
-                  </label>
-                  <input
-                    id={`clarify-q-${i}`}
-                    type="text"
-                    value={answers[q] ?? ""}
-                    onChange={(e) =>
-                      setAnswers((prev) => ({ ...prev, [q]: e.target.value }))
-                    }
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleSubmitAnswers();
-                      }
-                    }}
-                    placeholder="Ketik jawaban singkat..."
-                    className="w-full bg-surface-container text-text-primary text-body-sm px-3 py-2.5 rounded-lg border border-border-subtle focus:border-primary/60 focus:ring-1 focus:ring-primary/20 outline-none transition-all placeholder-text-secondary/50"
-                  />
-                </div>
-              ))}
+            <div className="space-y-6">
+              {questions.map((q, i) => {
+                const qText = q.text.replace(/\s*\(choices?:.*?\)/i, "");
+                return (
+                  <div key={i} className="flex flex-col gap-2.5">
+                    <label
+                      htmlFor={`clarify-q-${i}`}
+                      className="text-label-sm font-medium text-text-primary flex items-start gap-2 leading-relaxed"
+                    >
+                      <span className="w-5 h-5 rounded-full bg-primary/15 text-primary text-xs flex items-center justify-center font-bold shrink-0 mt-0.5">
+                        {i + 1}
+                      </span>
+                      {qText}
+                    </label>
+                    
+                    {q.type === "choice" && q.choices && q.choices.length > 0 ? (
+                      <div className="flex flex-wrap gap-2 pl-7">
+                        {q.choices.map((choice) => (
+                          <button
+                            key={choice}
+                            onClick={() => setAnswers((prev) => ({ ...prev, [q.text]: choice }))}
+                            className={`text-xs px-3.5 py-1.5 rounded-full border transition-colors cursor-pointer ${
+                              answers[q.text] === choice
+                                ? "bg-primary text-on-primary border-primary font-medium shadow-[0_0_10px_rgba(94,237,137,0.2)]"
+                                : "bg-surface-container text-text-secondary border-border-subtle hover:border-primary/50"
+                            }`}
+                          >
+                            {choice}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="pl-7">
+                        <input
+                          id={`clarify-q-${i}`}
+                          type="text"
+                          value={answers[q.text] ?? ""}
+                          onChange={(e) =>
+                            setAnswers((prev) => ({ ...prev, [q.text]: e.target.value }))
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleSubmitAnswers();
+                            }
+                          }}
+                          placeholder="Ketik jawaban singkat jika ada..."
+                          className="w-full bg-surface-container text-text-primary text-body-sm px-3 py-2.5 rounded-lg border border-border-subtle focus:border-primary/60 focus:ring-1 focus:ring-primary/20 outline-none transition-all placeholder-text-secondary/50"
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             {/* Actions */}

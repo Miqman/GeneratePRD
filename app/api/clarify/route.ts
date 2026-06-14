@@ -27,19 +27,36 @@ export async function POST(request: NextRequest) {
       .replace(/\s*```$/i, "")
       .trim();
 
-    let parsed: { needsClarification: boolean; questions?: string[] };
+    let parsed: { needsClarification: boolean; questions?: any[] };
     try {
       parsed = JSON.parse(cleaned);
+
+      // Validasi struktur minimal
+      if (typeof parsed.needsClarification !== "boolean") {
+        throw new Error("Invalid response structure");
+      }
     } catch {
-      // If the model failed to produce valid JSON, assume no clarification needed
-      console.warn("Clarify: model returned non-JSON, skipping clarification:", cleaned);
-      parsed = { needsClarification: false };
+      console.warn("Clarify: invalid JSON from model:", cleaned);
+      // Fail SAFE: kalau model gagal, lebih baik tanya ke user
+      // daripada generate PRD yang potentially vague
+      parsed = {
+        needsClarification: true,
+        questions: [
+          { text: "Siapa yang akan lebih sering pakai aplikasi ini?", type: "choice", choices: ["Pemain/pelanggan", "Pemilik/pengelola", "Keduanya"] },
+          { text: "Masalah apa yang paling sering terjadi saat proses ini dilakukan secara manual sekarang?", type: "open" },
+        ],
+      };
     }
 
     return NextResponse.json(parsed);
   } catch (error) {
     console.error("Clarify error:", error);
-    // Fail gracefully — don't block PRD generation on clarification errors
-    return NextResponse.json({ needsClarification: false });
+    return NextResponse.json({
+      needsClarification: true,
+      questions: [
+        { text: "Siapa yang akan lebih sering pakai aplikasi ini?", type: "choice", choices: ["Pemain/pelanggan", "Pemilik/pengelola", "Keduanya"] },
+        { text: "Masalah apa yang paling sering terjadi saat proses ini dilakukan secara manual sekarang?", type: "open" },
+      ],
+    });
   }
 }
