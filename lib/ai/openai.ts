@@ -1,5 +1,7 @@
 import type { AIProvider } from "./provider";
 import { truncatePRDForChat } from "./provider";
+import type { AgenticChatResult } from "../types";
+import { AGENTIC_CHAT_SYSTEM_PROMPT, AGENTIC_UPDATE_PRD_TOOL, parseAgenticResponse } from "../prd-prompt";
 
 /** Parse OpenAI-compatible SSE stream and yield text deltas */
 async function* parseOpenAISSE(response: Response): AsyncGenerator<string> {
@@ -48,7 +50,7 @@ function openAIStreamToReadable(response: Response): ReadableStream<string> {
 // ============================================================
 
 const openaiProvider: AIProvider = {
-  async generatePRD(prompt: string, language: "id" | "en"): Promise<string> {
+  async generatePRD(prompt: string, language: "id" | "en", complexity?: "simple" | "medium" | "complex"): Promise<string> {
     const { PRD_SYSTEM_PROMPT } = await import("@/lib/prd-prompt");
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -59,7 +61,7 @@ const openaiProvider: AIProvider = {
       body: JSON.stringify({
         model: process.env.OPENAI_MODEL || "gpt-4o",
         messages: [
-          { role: "system", content: PRD_SYSTEM_PROMPT(language) },
+          { role: "system", content: PRD_SYSTEM_PROMPT(language, complexity) },
           { role: "user", content: prompt },
         ],
         temperature: 0.7,
@@ -177,6 +179,53 @@ const openaiProvider: AIProvider = {
     }
 
     return openAIStreamToReadable(response);
+  },
+
+  async agenticChat(
+    currentPRD: string,
+    messages: Array<{ role: string; content: string }>,
+    language: "id" | "en"
+  ): Promise<AgenticChatResult> {
+    const systemPrompt = AGENTIC_CHAT_SYSTEM_PROMPT(language);
+    const prdContext = `Current PRD:\n\n${currentPRD}`;
+    const fullMessages = [
+      { role: "system", content: systemPrompt },
+      { role: "system", content: prdContext },
+      ...messages,
+    ];
+
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: process.env.OPENAI_MODEL || "gpt-4o",
+        messages: fullMessages,
+        tools: [AGENTIC_UPDATE_PRD_TOOL],
+        tool_choice: "auto",
+        temperature: 0.7,
+        max_tokens: 2048,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const parsed = parseAgenticResponse(data);
+
+    if (parsed.type === "text") {
+      return { type: "discussion", message: parsed.text };
+    } else {
+      return {
+        type: "edit",
+        message: parsed.confirmationText,
+        toolInput: parsed.toolInput,
+      };
+    }
   },
 
   async clarify(prompt: string, language: "id" | "en"): Promise<string> {

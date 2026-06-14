@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback, use } from "react";
+import { useEffect, useState, useCallback, use, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, Menu, Eye, Code2, Download, Copy, ChevronDown, Loader2, Check } from "lucide-react";
+import { Menu, Eye, Code2, Download, Copy, ChevronDown, Loader2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -40,11 +40,12 @@ export default function PRDEditorPage({
   const [currentVersion, setCurrentVersion] = useState<PRDVersion | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRevising, setIsRevising] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("preview");
   const [copied, setCopied] = useState(false);
   const [activeSection, setActiveSection] = useState("overview");
+  const previousPrdRef = useRef<PRDVersion | null>(null);
+  const conversationHistoryRef = useRef<Array<{ role: string; content: string }>>([]);
 
   const loadSession = useCallback(async () => {
     setIsLoading(true);
@@ -82,10 +83,10 @@ export default function PRDEditorPage({
   };
 
   const handleChat = async (message: string) => {
-    if (!message.trim() || isRevising || isStreaming) return;
+    if (!message.trim() || isStreaming || !currentVersion) return;
     setIsStreaming(true);
 
-    // Optimistic: add user message
+    // Optimistic: add user message to chat UI
     const tempUserMsg: ChatMessage = {
       id: `temp-${Date.now()}`,
       sessionId: id,
@@ -95,170 +96,107 @@ export default function PRDEditorPage({
     };
     setChatMessages((prev) => [...prev, tempUserMsg]);
 
-    // Create a placeholder for the streaming assistant message
-    const streamingMsgId = `stream-${Date.now()}`;
-    const streamingMsg: ChatMessage = {
-      id: streamingMsgId,
-      sessionId: id,
-      role: "assistant",
-      content: "",
-      createdAt: new Date().toISOString(),
-    };
-    setChatMessages((prev) => [...prev, streamingMsg]);
+    // Add to conversation history
+    conversationHistoryRef.current = [
+      ...conversationHistoryRef.current,
+      { role: "user", content: message },
+    ];
 
     try {
-      const res = await fetch(`/api/prd/${id}/chat`, {
+      const res = await fetch("/api/agentic-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({
+          sessionId: id,
+          messages: conversationHistoryRef.current,
+          currentPrd: currentVersion.content,
+          language: session?.language || "id",
+        }),
       });
 
-      if (!res.ok) throw new Error("Chat failed");
-      if (!res.body) throw new Error("No response body");
+      if (!res.ok) throw new Error("Agentic chat failed");
+      const data = await res.json();
 
-      // Read SSE stream
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let userMsgId = tempUserMsg.id;
-      let accumulatedText = "";
+      // Add assistant message to conversation history
+      conversationHistoryRef.current = [
+        ...conversationHistoryRef.current,
+        { role: "assistant", content: data.message },
+      ];
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      if (data.type === "discussion") {
+        // Show AI discussion in chat
+        const assistantMsg: ChatMessage = {
+          id: data.assistantMessageId || `assistant-${Date.now()}`,
+          sessionId: id,
+          role: "assistant",
+          content: data.message,
+          createdAt: new Date().toISOString(),
+        };
+        // Replace temp user msg ID with server ID, add assistant msg
+        setChatMessages((prev) => [
+          ...prev.filter((m) => m.id !== tempUserMsg.id),
+          { ...tempUserMsg, id: `user-${Date.now()}` },
+          assistantMsg,
+        ]);
+      } else if (data.type === "edit") {
+        // Save previous version for undo
+        previousPrdRef.current = currentVersion;
 
-        buffer += decoder.decode(value, { stream: true });
-        // Parse SSE events (separated by \n\n)
-        const events = buffer.split("\n\n");
-        buffer = events.pop() || ""; // keep incomplete event
+        // Update PRD immediately (optimistic)
+        const newVersion: PRDVersion = {
+          id: data.versionId,
+          sessionId: id,
+          versionNumber: data.versionNumber,
+          content: data.updatedPrd,
+          changeDescription: data.revisionSummary || "Revisi dari agentic chat",
+          createdAt: new Date().toISOString(),
+        };
+        setCurrentVersion(newVersion);
+        setSession((prev) =>
+          prev
+            ? { ...prev, versions: [newVersion, ...(prev.versions || [])] }
+            : prev
+        );
 
-        for (const eventBlock of events) {
-          const lines = eventBlock.split("\n");
-          let eventType = "";
-          let eventData = "";
+        // Show AI confirmation in chat
+        const assistantMsg: ChatMessage = {
+          id: data.assistantMessageId || `assistant-${Date.now()}`,
+          sessionId: id,
+          role: "assistant",
+          content: data.message || `PRD diperbarui: ${data.revisionSummary}`,
+          createdAt: new Date().toISOString(),
+        };
+        setChatMessages((prev) => [
+          ...prev.filter((m) => m.id !== tempUserMsg.id),
+          { ...tempUserMsg, id: `user-${Date.now()}` },
+          assistantMsg,
+        ]);
 
-          for (const line of lines) {
-            if (line.startsWith("event: ")) eventType = line.slice(7).trim();
-            else if (line.startsWith("data: ")) eventData = line.slice(6);
-          }
-
-          if (!eventType || !eventData) continue;
-
-          try {
-            const data = JSON.parse(eventData);
-
-            if (eventType === "start") {
-              // Replace temp user msg ID with real one
-              userMsgId = data.userMessageId;
-            } else if (eventType === "text") {
-              accumulatedText += data.text;
-              setChatMessages((prev) =>
-                prev.map((m) =>
-                  m.id === streamingMsgId
-                    ? { ...m, content: accumulatedText }
-                    : m.id === tempUserMsg.id
-                    ? { ...m, id: userMsgId }
-                    : m
-                )
-              );
-            } else if (eventType === "done") {
-              // Finalize the assistant message
-              setChatMessages((prev) =>
-                prev.map((m) =>
-                  m.id === streamingMsgId
-                    ? {
-                        ...m,
-                        id: data.assistantMessageId,
-                        content: accumulatedText || m.content,
-                        revisionProposal: data.revisionProposal || undefined,
-                      }
-                    : m
-                )
-              );
-            } else if (eventType === "error") {
-              throw new Error(data.message || "Stream error");
-            }
-          } catch (parseErr) {
-            // If it's an error from the "error" event, re-throw
-            if (eventType === "error") throw parseErr;
-            // Otherwise skip malformed events
-          }
-        }
+        // Show toast with undo
+        const isDestructive = data.changeType === "destructive";
+        const toastFn = isDestructive ? toast.warning : toast.success;
+        toastFn(`PRD diperbarui: ${data.revisionSummary}`, {
+          action: {
+            label: "Undo",
+            onClick: () => {
+              if (previousPrdRef.current) {
+                setCurrentVersion(previousPrdRef.current);
+                toast.info("PRD dikembalikan ke versi sebelumnya");
+                previousPrdRef.current = null;
+              }
+            },
+          },
+          duration: 8000,
+        });
       }
     } catch {
       toast.error("Gagal memproses pesan. Silakan coba lagi.");
-      // Remove temp messages
-      setChatMessages((prev) =>
-        prev.filter((m) => m.id !== tempUserMsg.id && m.id !== streamingMsgId)
-      );
+      // Remove temp user message
+      setChatMessages((prev) => prev.filter((m) => m.id !== tempUserMsg.id));
+      // Remove from conversation history
+      conversationHistoryRef.current = conversationHistoryRef.current.slice(0, -1);
     } finally {
       setIsStreaming(false);
-    }
-  };
-
-  const handleApplyRevision = async (
-    instruction: string,
-    messageId: string
-  ) => {
-    if (!instruction.trim() || isRevising || isStreaming) return;
-    setIsRevising(true);
-
-    // Mark proposal as applied in UI
-    setChatMessages((prev) =>
-      prev.map((m) =>
-        m.id === messageId ? { ...m, revisionApplied: true } : m
-      )
-    );
-
-    try {
-      const res = await fetch(`/api/prd/${id}/revise`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ instruction }),
-      });
-
-      if (!res.ok) throw new Error("Revisi gagal");
-      const data = await res.json();
-
-      const newVersion: PRDVersion = {
-        id: data.versionId,
-        sessionId: id,
-        versionNumber: data.versionNumber,
-        content: data.content,
-        changeDescription: `Revisi dari chat`,
-        createdAt: new Date().toISOString(),
-      };
-
-      setCurrentVersion(newVersion);
-      setSession((prev) =>
-        prev
-          ? {
-              ...prev,
-              versions: [newVersion, ...(prev.versions || [])],
-            }
-          : prev
-      );
-
-      // Add confirmation message
-      const confirmMsg: ChatMessage = {
-        id: `confirm-${Date.now()}`,
-        sessionId: id,
-        role: "assistant",
-        content: `PRD diperbarui ke **Version ${data.versionNumber}**. Perubahan berhasil diterapkan!`,
-        createdAt: new Date().toISOString(),
-      };
-      setChatMessages((prev) => [...prev, confirmMsg]);
-      toast.success(`PRD diperbarui ke Version ${data.versionNumber}`);
-    } catch {
-      toast.error("Gagal merevisi PRD. Silakan coba lagi.");
-      // Revert applied state
-      setChatMessages((prev) =>
-        prev.map((m) =>
-          m.id === messageId ? { ...m, revisionApplied: false } : m
-        )
-      );
-    } finally {
-      setIsRevising(false);
     }
   };
 
@@ -447,15 +385,13 @@ export default function PRDEditorPage({
           content={currentVersion.content}
           viewMode={viewMode}
           onSectionVisible={setActiveSection}
-          isRevising={isRevising}
+          isRevising={false}
         />
 
-        {/* RIGHT: Chat revision */}
+        {/* RIGHT: Chat */}
         <PRDChatPanel
           messages={chatMessages}
           onChat={handleChat}
-          onApplyRevision={handleApplyRevision}
-          isRevising={isRevising}
           isStreaming={isStreaming}
         />
       </div>

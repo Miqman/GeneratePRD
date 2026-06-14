@@ -2,8 +2,10 @@
 // AI Provider Interface
 // ============================================================
 
+import type { AgenticChatResult } from "../types";
+
 export interface AIProvider {
-  generatePRD(prompt: string, language: "id" | "en"): Promise<string>;
+  generatePRD(prompt: string, language: "id" | "en", complexity?: "simple" | "medium" | "complex"): Promise<string>;
   revisePRD(currentPRD: string, instruction: string, language: "id" | "en"): Promise<string>;
   /** Chat about the PRD with intent detection. Returns raw JSON string from the model. */
   chatPRD(currentPRD: string, message: string, language: "id" | "en"): Promise<string>;
@@ -13,6 +15,12 @@ export interface AIProvider {
     message: string,
     language: "id" | "en"
   ): Promise<ReadableStream<string>>;
+  /** Agentic chat with tool calling — can discuss or directly edit PRD. */
+  agenticChat(
+    currentPRD: string,
+    messages: Array<{ role: string; content: string }>,
+    language: "id" | "en"
+  ): Promise<AgenticChatResult>;
   /** Evaluate if a prompt needs clarification. Returns raw JSON string from the model. */
   clarify(prompt: string, language: "id" | "en"): Promise<string>;
 }

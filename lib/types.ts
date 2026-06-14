@@ -37,9 +37,21 @@ export interface ChatMessage {
   revisionApplied?: boolean;
 }
 
+export interface AgenticChatResult {
+  type: "discussion" | "edit";
+  message: string;
+  toolInput?: {
+    revisionInstruction: string;
+    sectionsAffected: string[];
+    changeType: "normal" | "destructive";
+    revisionSummary: string;
+  };
+}
+
 export interface GeneratePRDRequest {
   prompt: string;
   language: "id" | "en";
+  complexity?: "simple" | "medium" | "complex";
 }
 
 export interface RevisePRDRequest {
@@ -56,12 +68,17 @@ export const PRD_SECTIONS: PRDSection[] = [
   { id: "overview", title: "1. Overview", anchor: "overview" },
   { id: "requirements", title: "2. Requirements", anchor: "requirements" },
   { id: "core-features", title: "3. Core Features", anchor: "core-features" },
-  { id: "user-flow", title: "4. User Flow", anchor: "user-flow" },
+  { id: "user-flows", title: "4. User Flows", anchor: "user-flows" },
   { id: "architecture", title: "5. Architecture", anchor: "architecture" },
   {
+    id: "design-constraints",
+    title: "6. Design & Technical Constraints",
+    anchor: "design-constraints",
+  },
+  {
     id: "database-schema",
-    title: "6. Database Schema",
+    title: "7. Database Schema",
     anchor: "database-schema",
   },
-  { id: "tech-stack", title: "7. Tech Stack", anchor: "tech-stack" },
+  { id: "tech-stack", title: "8. Tech Stack & Next Steps", anchor: "tech-stack" },
 ];

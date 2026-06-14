@@ -113,6 +113,14 @@ export function PRDContentPanel({
           {children}
         </HeadingWithId>
       ),
+      pre: ({ children, ...props }: any) => {
+        // If the child is a MermaidDiagram, skip the <pre> wrapper
+        const child = Array.isArray(children) ? children[0] : children;
+        if (child?.props?.className?.includes("language-mermaid")) {
+          return <>{children}</>;
+        }
+        return <pre {...props}>{children}</pre>;
+      },
       code({ className, children, ...rest }: any) {
         const lang = /language-(\w+)/.exec(className ?? "")?.[1];
         if (lang === "mermaid") {

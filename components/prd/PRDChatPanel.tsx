@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Send, Loader2, Bot, User, MessageSquare, Wrench, CheckCircle2 } from "lucide-react";
+import { Send, Loader2, Bot, User, MessageSquare } from "lucide-react";
 import type { ChatMessage } from "@/lib/types";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -12,8 +11,6 @@ import remarkGfm from "remark-gfm";
 interface PRDChatPanelProps {
   messages: ChatMessage[];
   onChat: (message: string) => void;
-  onApplyRevision: (instruction: string, messageId: string) => void;
-  isRevising: boolean;
   isStreaming: boolean;
 }
 
@@ -27,24 +24,20 @@ const CONVERSATION_STARTERS = [
 export function PRDChatPanel({
   messages,
   onChat,
-  onApplyRevision,
-  isRevising,
   isStreaming,
 }: PRDChatPanelProps) {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const isBusy = isRevising || isStreaming;
-
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, isBusy]);
+  }, [messages, isStreaming]);
 
   const handleSend = () => {
-    if (!input.trim() || isBusy) return;
+    if (!input.trim() || isStreaming) return;
     onChat(input.trim());
     setInput("");
   };
@@ -151,48 +144,11 @@ export function PRDChatPanel({
                     )}
                   </div>
                 </div>
-
-                {/* Revision Proposal Card */}
-                {msg.revisionProposal && (
-                  <div className="ml-8 animate-fade-in-up">
-                    <div className="bg-primary/5 border border-primary/20 rounded-lg p-2.5 space-y-2">
-                      <div className="flex items-start gap-1.5">
-                        <Wrench className="w-3 h-3 text-primary shrink-0 mt-0.5" />
-                        <p className="text-[11px] font-medium text-foreground leading-snug">
-                          Usulan Perubahan
-                        </p>
-                      </div>
-                      <p className="text-[10px] text-muted-foreground leading-relaxed">
-                        {msg.revisionProposal.summary}
-                      </p>
-                      {msg.revisionApplied ? (
-                        <span className="text-[10px] text-green-500 bg-green-500/10 rounded-md px-2 py-1 inline-flex items-center gap-1">
-                          <CheckCircle2 className="w-2.5 h-2.5" />
-                          Applied
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() =>
-                            onApplyRevision(
-                              msg.revisionProposal!.instruction,
-                              msg.id
-                            )
-                          }
-                          disabled={isBusy}
-                          className="text-[10px] text-primary/80 hover:text-primary bg-primary/10 hover:bg-primary/20 disabled:opacity-40 rounded-md px-2 py-1 transition-all inline-flex items-center gap-1"
-                        >
-                          <Wrench className="w-2.5 h-2.5" />
-                          Execute
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
               </div>
             ))}
 
-            {/* Typing indicator (only when revising, not streaming) */}
-            {isRevising && (
+            {/* Typing indicator */}
+            {isStreaming && messages[messages.length - 1]?.role === "user" && (
               <div className="flex gap-2 animate-fade-in-up">
                 <div className="w-6 h-6 rounded-full bg-muted border border-border flex items-center justify-center shrink-0">
                   <Bot className="w-3 h-3 text-muted-foreground" />
@@ -233,16 +189,16 @@ export function PRDChatPanel({
             onKeyDown={handleKeyDown}
             placeholder="Tanya atau instruksikan perubahan... (Ctrl+Enter)"
             className="min-h-[60px] max-h-[120px] resize-none text-[11px] bg-muted/30 border-border/50 focus:border-primary/40 placeholder:text-muted-foreground/50 rounded-xl"
-            disabled={isBusy}
+            disabled={isStreaming}
           />
           <Button
             id="send-revision-btn"
             size="sm"
             onClick={handleSend}
-            disabled={!input.trim() || isBusy}
+            disabled={!input.trim() || isStreaming}
             className="w-8 h-8 p-0 shrink-0 bg-primary hover:bg-primary/90 disabled:opacity-30 rounded-lg"
           >
-            {isBusy ? (
+            {isStreaming ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
             ) : (
               <Send className="w-3.5 h-3.5" />

@@ -1,18 +1,22 @@
 import type { AIProvider } from "./provider";
+import type { AgenticChatResult } from "../types";
 
 // ============================================================
 // Mock AI Provider — realistic PRD output for testing
 // ============================================================
 
-function generateMockPRD(prompt: string, language: "id" | "en"): string {
+function generateMockPRD(prompt: string, language: "id" | "en", complexity?: "simple" | "medium" | "complex"): string {
   const isId = language === "id";
   const productName = extractProductName(prompt);
+  const isSimple = complexity === "simple";
+  const isComplex = complexity === "complex";
 
-  return `# PRD — Project Requirements Document
+  const sectionsList: { name: string; content: string }[] = [];
 
-## 1. Overview
-
-**Nama Produk:** ${productName}
+  // 1. Overview
+  sectionsList.push({
+    name: "Overview",
+    content: `**Nama Produk:** ${productName}
 
 **Masalah yang Diselesaikan:**
 ${isId ? `Berdasarkan deskripsi Anda, produk ini hadir untuk menyelesaikan tantangan yang dihadapi oleh pengguna dalam hal ${prompt.slice(0, 100)}. Saat ini, pengguna masih menggunakan cara manual yang tidak efisien, membuang waktu dan sering terjadi kesalahan.` : `Based on your description, this product addresses challenges faced by users regarding ${prompt.slice(0, 100)}. Currently, users rely on manual processes that are inefficient and error-prone.`}
@@ -24,13 +28,13 @@ ${isId ? `- Menyederhanakan proses yang ada menjadi lebih efisien dan otomatis
 - Meningkatkan akurasi dan mengurangi human error` : `- Simplify existing processes to be more efficient and automated
 - Provide an intuitive and delightful user experience
 - Reduce time required from hours to minutes
-- Improve accuracy and reduce human error`}
+- Improve accuracy and reduce human error`}`
+  });
 
----
-
-## 2. Requirements
-
-### Functional Requirements
+  // 2. Requirements
+  sectionsList.push({
+    name: "Requirements",
+    content: `### Functional Requirements
 ${isId ? `- **FR-01:** Pengguna dapat mendaftar dan masuk menggunakan email/password atau Google OAuth
 - **FR-02:** Pengguna dapat membuat, mengedit, dan menghapus data utama
 - **FR-03:** Sistem harus mendukung pencarian dan filter data secara real-time
@@ -63,13 +67,13 @@ ${isId ? `- **BR-01:** Time-to-market maksimal 3 bulan untuk MVP
 - **BR-04:** Compliance dengan regulasi data lokal (UU PDP Indonesia)` : `- **BR-01:** Maximum 3-month time-to-market for MVP
 - **BR-02:** Cloud infrastructure cost < $500/month for 1,000 users
 - **BR-03:** Integration with existing team tools (Slack, Notion)
-- **BR-04:** Compliance with local data regulations`}
+- **BR-04:** Compliance with local data regulations`}`
+  });
 
----
-
-## 3. Core Features
-
-### MVP (Fase 1 — Rilis Awal)
+  // 3. Core Features
+  sectionsList.push({
+    name: "Core Features",
+    content: `### MVP (Fase 1 — Rilis Awal)
 ${isId ? `**Target: Bulan 1-3**
 
 - ✅ Autentikasi pengguna (email + Google OAuth)
@@ -118,13 +122,13 @@ ${isId ? `**Target: Bulan 7-12**
 - 💎 Complete audit log and compliance reports
 - 💎 Custom workflows and automation
 - 💎 Dedicated support (4-hour SLA)
-- 💎 On-premise deployment option`}
+- 💎 On-premise deployment option`}`
+  });
 
----
-
-## 4. User Flow
-
-### Flow 1: Onboarding & Registrasi
+  // 4. User Flows
+  sectionsList.push({
+    name: "User Flows",
+    content: `### Flow 1: Onboarding & Registrasi
 \`\`\`
 Landing Page → Klik "Daftar Gratis"
     → Form Registrasi (nama, email, password)
@@ -158,13 +162,14 @@ Settings → Tim → Undang Anggota
     → Kirim undangan email
     → Anggota terima → Klik link → Bergabung otomatis
     → Notifikasi ke semua anggota tim
-\`\`\`
+\`\`\``
+  });
 
----
-
-## 5. Architecture
-
-\`\`\`
+  // 5. Architecture
+  if (!isSimple) {
+    sectionsList.push({
+      name: "Architecture",
+      content: `\`\`\`
 ┌─────────────────────────────────────────────────┐
 │                  CLIENT LAYER                    │
 │  Next.js 16 (App Router) + React 19              │
@@ -196,13 +201,34 @@ Settings → Tim → Undang Anggota
 - **Frontend + Backend:** Vercel (serverless)
 - **Database:** Supabase PostgreSQL
 - **File Storage:** Supabase Storage (jika diperlukan)
-- **CDN:** Vercel Edge Network
+- **CDN:** Vercel Edge Network`
+    });
+  }
 
----
+  // 6. Design & Technical Constraints (Only for complex products)
+  if (isComplex) {
+    sectionsList.push({
+      name: "Design & Technical Constraints",
+      content: `### Typography
+* **Font Family:** Inter, sans-serif
+* **Ukuran:** body 14px, h1 32px, h2 24px, h3 18px
+* **Weight:** 400 body, 500 subheading, 700 heading
+* **Line Height:** 1.5 body, 1.2 heading
 
-## 6. Database Schema
+### Visual Identity
+* **Warna Utama:** #10B981 primary, #059669 secondary, #34D399 accent
+* **Status Colors:** success #10B981, warning #F59E0B, error #EF4444, info #3B82F6
 
-\`\`\`sql
+### Constraints Lainnya
+* [C-01] **Performance** — FCP harus di bawah 1.5 detik pada koneksi 3G lambat.`
+    });
+  }
+
+  // 7. Database Schema
+  if (!isSimple) {
+    sectionsList.push({
+      name: "Database Schema",
+      content: `\`\`\`sql
 -- Users (dikelola Better Auth)
 users (id, email, name, image, email_verified, created_at, updated_at)
 
@@ -239,13 +265,14 @@ activity_logs (
   metadata    JSONB,
   created_at  TIMESTAMP DEFAULT NOW()
 )
-\`\`\`
+\`\`\``
+    });
+  }
 
----
-
-## 7. Tech Stack
-
-### Recommended Stack
+  // 8. Tech Stack & Next Steps
+  sectionsList.push({
+    name: "Tech Stack & Next Steps",
+    content: `### Recommended Stack
 
 | Layer | Technology | Alasan |
 |---|---|---|
@@ -286,8 +313,14 @@ Stack ini dipilih untuk **kecepatan development tanpa mengorbankan scalability**
 3. **Build MVP Features** — Core CRUD, dashboard dasar
 4. **Testing** — Unit test untuk business logic, E2E dengan Playwright
 5. **Deploy** — Push ke GitHub, connect ke Vercel, set env vars production
-6. **Monitor** — Setup Sentry, Vercel Analytics, alert untuk error rate
-`;
+6. **Monitor** — Setup Sentry, Vercel Analytics, alert untuk error rate`
+  });
+
+  const renderedSections = sectionsList.map((sec, idx) => {
+    return `## ${idx + 1}. ${sec.name}\n\n${sec.content}`;
+  });
+
+  return `# PRD — ${productName}\n\n${renderedSections.join("\n\n")}`;
 }
 
 function extractProductName(prompt: string): string {
@@ -302,10 +335,10 @@ function generateMockRevision(currentPRD: string, instruction: string): string {
 }
 
 const mockProvider: AIProvider = {
-  async generatePRD(prompt: string, language: "id" | "en"): Promise<string> {
+  async generatePRD(prompt: string, language: "id" | "en", complexity?: "simple" | "medium" | "complex"): Promise<string> {
     // Simulate AI delay
     await new Promise((resolve) => setTimeout(resolve, 1500));
-    return generateMockPRD(prompt, language);
+    return generateMockPRD(prompt, language, complexity);
   },
 
   async revisePRD(
@@ -375,6 +408,48 @@ const mockProvider: AIProvider = {
     });
   },
 
+  async agenticChat(
+    _currentPRD: string,
+    messages: Array<{ role: string; content: string }>,
+    language: "id" | "en"
+  ): Promise<AgenticChatResult> {
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    const isId = language === "id";
+    const lastMessage = messages[messages.length - 1]?.content || "";
+    const lower = lastMessage.toLowerCase();
+
+    // Detect edit intent
+    const editKeywords = isId
+      ? ["ubah", "ganti", "tambah", "hapus", "perbaiki", "update"]
+      : ["change", "update", "add", "remove", "fix", "modify"];
+
+    const isEdit = editKeywords.some((kw) => lower.includes(kw));
+
+    if (isEdit) {
+      return {
+        type: "edit",
+        message: isId
+          ? "PRD telah diperbarui sesuai instruksi Anda."
+          : "PRD has been updated according to your instruction.",
+        toolInput: {
+          revisionInstruction: lastMessage,
+          sectionsAffected: ["Requirements", "Core Features"],
+          changeType: "normal",
+          revisionSummary: isId
+            ? `Perubahan: ${lastMessage.slice(0, 40)}`
+            : `Change: ${lastMessage.slice(0, 40)}`,
+        },
+      };
+    }
+
+    return {
+      type: "discussion",
+      message: isId
+        ? `Pertanyaan yang bagus! Berdasarkan PRD saat ini, berikut penjelasan mengenai **${lastMessage.slice(0, 60)}**:\n\nKeputusan ini diambil berdasarkan best practice industri. Jika ingin mengubah, cukup instruksikan langsung.`
+        : `Great question! Based on the current PRD, here's the reasoning behind **${lastMessage.slice(0, 60)}**:\n\nThis decision is based on industry best practices. Feel free to instruct changes directly.`,
+    };
+  },
+
   async clarify(prompt: string, language: "id" | "en"): Promise<string> {
     await new Promise((resolve) => setTimeout(resolve, 400));
     const isId = language === "id";
@@ -382,20 +457,21 @@ const mockProvider: AIProvider = {
     if (prompt.trim().length < 60) {
       return JSON.stringify({
         needsClarification: true,
+        complexity: "medium",
         questions: isId
           ? [
-              "Siapa target pengguna utama produk ini?",
-              "Apa fitur inti yang harus ada di MVP?",
-              "Apakah ada integrasi dengan layanan lain yang diperlukan?",
+              { text: "Siapa yang akan lebih sering pakai aplikasi ini?", type: "open" },
+              { text: "Masalah apa yang paling sering terjadi saat proses ini dilakukan secara manual?", type: "open" },
+              { text: "Apakah ini untuk satu tempat usaha atau banyak?", type: "choice", choices: ["Satu saja", "Banyak/marketplace"] },
             ]
           : [
-              "Who is the primary target user for this product?",
-              "What core features must be in the MVP?",
-              "Are there any third-party integrations required?",
+              { text: "Who will use this app most often?", type: "open" },
+              { text: "What problems happen most when doing this manually?", type: "open" },
+              { text: "Is this for one business or many?", type: "choice", choices: ["Single business", "Multi-tenant/marketplace"] },
             ],
       });
     }
-    return JSON.stringify({ needsClarification: false });
+    return JSON.stringify({ needsClarification: false, complexity: "medium" });
   },
 };
 

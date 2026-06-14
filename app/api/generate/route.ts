@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { prompt, language = "id", answers } = body;
+    const { prompt, language = "id", answers, complexity } = body;
 
     if (!prompt || typeof prompt !== "string" || prompt.trim().length < 10) {
       return NextResponse.json(
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
 
     // Generate PRD via AI provider
     const aiProvider = await getAIProvider();
-    const prdContent = await aiProvider.generatePRD(enrichedPrompt, language);
+    const prdContent = await aiProvider.generatePRD(enrichedPrompt, language, complexity);
 
     // Extract title from prompt (first 60 chars)
     const title =

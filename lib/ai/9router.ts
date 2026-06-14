@@ -1,5 +1,7 @@
 import type { AIProvider } from "./provider";
 import { truncatePRDForChat } from "./provider";
+import type { AgenticChatResult } from "../types";
+import { AGENTIC_CHAT_SYSTEM_PROMPT, AGENTIC_UPDATE_PRD_TOOL, parseAgenticResponse } from "../prd-prompt";
 
 // ============================================================
 // 9router Adapter — aktif saat AI_PROVIDER=9router
@@ -72,10 +74,10 @@ async function chatCompletion(
 }
 
 const ninerouterProvider: AIProvider = {
-  async generatePRD(prompt: string, language: "id" | "en"): Promise<string> {
+  async generatePRD(prompt: string, language: "id" | "en", complexity?: "simple" | "medium" | "complex"): Promise<string> {
     const { PRD_SYSTEM_PROMPT } = await import("@/lib/prd-prompt");
     // PRD lengkap butuh token besar — gunakan max yang didukung model
-    return chatCompletion(PRD_SYSTEM_PROMPT(language), prompt, 8192);
+    return chatCompletion(PRD_SYSTEM_PROMPT(language, complexity), prompt, 8192);
   },
 
   async revisePRD(
@@ -159,6 +161,55 @@ const ninerouterProvider: AIProvider = {
         }
       },
     });
+  },
+
+  async agenticChat(
+    currentPRD: string,
+    messages: Array<{ role: string; content: string }>,
+    language: "id" | "en"
+  ): Promise<AgenticChatResult> {
+    const systemPrompt = AGENTIC_CHAT_SYSTEM_PROMPT(language);
+    const prdContext = `Current PRD:\n\n${currentPRD}`;
+    const fullMessages = [
+      { role: "system", content: systemPrompt },
+      { role: "system", content: prdContext },
+      ...messages,
+    ];
+
+    const response = await fetch(`${BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: fullMessages,
+        tools: [AGENTIC_UPDATE_PRD_TOOL],
+        tool_choice: "auto",
+        temperature: 0.7,
+        max_tokens: 2048,
+        stream: false,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text().catch(() => response.statusText);
+      throw new Error(`9router API error [${response.status}]: ${errorBody}`);
+    }
+
+    const data = await response.json();
+    const parsed = parseAgenticResponse(data);
+
+    if (parsed.type === "text") {
+      return { type: "discussion", message: parsed.text };
+    } else {
+      return {
+        type: "edit",
+        message: parsed.confirmationText,
+        toolInput: parsed.toolInput,
+      };
+    }
   },
 
   async clarify(prompt: string, language: "id" | "en"): Promise<string> {

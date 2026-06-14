@@ -46,6 +46,7 @@ export default function LandingPage() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [complexity, setComplexity] = useState<"simple" | "medium" | "complex">("medium");
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -75,6 +76,11 @@ export default function LandingPage() {
       });
 
       const data = await res.json();
+
+      // Capture complexity from clarify response
+      if (data.complexity && ["simple", "medium", "complex"].includes(data.complexity)) {
+        setComplexity(data.complexity);
+      }
 
       if (data.needsClarification && data.questions?.length > 0) {
         // Show questions
@@ -106,6 +112,7 @@ export default function LandingPage() {
           prompt: prompt.trim(),
           language,
           answers: answersMap,
+          complexity,
         }),
       });
 
