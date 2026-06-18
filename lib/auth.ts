@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 
 export const auth = betterAuth({
-  appName: "PRD Generator",
+  appName: "Rancang.ai",
   database: drizzleAdapter(db, {
     provider: "pg",
     schema: {

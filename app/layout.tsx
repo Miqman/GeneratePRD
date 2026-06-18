@@ -17,10 +17,10 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "prdforge.ai - AI PRD Generator",
+  title: "Rancang.ai - AI Document Generator",
   description:
-    "Generate Product Requirements Document (PRD) secara otomatis menggunakan AI. Masukkan ide produkmu, dapatkan PRD lengkap dalam hitungan detik.",
-  keywords: "PRD, product requirements document, AI, product management, generator",
+    "Rancang dokumen spesifikasi produkmu secara otomatis menggunakan AI. Dari PRD, design.md, hingga stitch spec — semua dalam hitungan detik.",
+  keywords: "PRD, design spec, product requirements, AI, product management, generator, rancang",
 };
 
 export default function RootLayout({

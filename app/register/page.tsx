@@ -49,7 +49,7 @@ export default function RegisterPage() {
       <div className="w-full max-w-md space-y-6 animate-fade-in-up relative">
         <div className="flex flex-col items-center gap-2 mb-2">
           <span className="font-extrabold text-foreground text-xl tracking-tight">
-            prd<span className="text-primary">forge</span>.ai
+            Rancang<span className="text-primary">.ai</span>
           </span>
         </div>
 

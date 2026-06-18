@@ -274,7 +274,7 @@ export default function PRDEditorPage({
           </Button>
           <Link href="/" className="flex items-center gap-1.5 shrink-0">
             <span className="font-extrabold text-foreground text-sm tracking-tight hidden sm:block">
-              prd<span className="text-primary">forge</span>.ai
+              Rancang<span className="text-primary">.ai</span>
             </span>
           </Link>
 

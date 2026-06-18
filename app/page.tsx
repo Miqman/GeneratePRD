@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Loader2,
@@ -12,6 +12,7 @@ import {
   Menu,
   MessageSquareQuote,
   SkipForward,
+  Wand2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,7 +22,7 @@ import {
   SelectItem,
   SelectTrigger,
 } from "@/components/ui/select";
-import { useSession } from "@/lib/auth-client";
+import { useSession, signOut } from "@/lib/auth-client";
 import Link from "next/link";
 import { Sidebar } from "@/components/layout/Sidebar";
 
@@ -41,6 +42,24 @@ export default function LandingPage() {
   const [pageState, setPageState] = useState<PageState>("idle");
   const [charCount, setCharCount] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [selectedMode, setSelectedMode] = useState<"prd" | "stitch" | null>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleLogout = async () => {
+    await signOut();
+    window.location.href = "/login";
+  };
 
   // Clarification state
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -168,7 +187,7 @@ export default function LandingPage() {
           )}
           <Link href="/" className="flex items-center gap-stack-sm">
             <span className="text-body-lg font-body-lg font-extrabold text-on-surface tracking-tight">
-              prd<span className="text-primary">forge</span>.ai
+              Rancang<span className="text-primary">.ai</span>
             </span>
           </Link>
         </div>
@@ -180,8 +199,38 @@ export default function LandingPage() {
             Upgrade
           </button>
           {session?.user ? (
-            <div className="w-9 h-9 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-label-md select-none">
-              {(session.user.name || session.user.email || "U")[0].toUpperCase()}
+            <div ref={userMenuRef} className="relative">
+              <button
+                id="user-avatar-btn"
+                onClick={() => setUserMenuOpen((prev) => !prev)}
+                aria-label="Menu akun"
+                className="w-9 h-9 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-label-md select-none cursor-pointer hover:ring-2 hover:ring-primary/40 transition-all"
+              >
+                {(session.user.name || session.user.email || "U")[0].toUpperCase()}
+              </button>
+
+              {userMenuOpen && (
+                <div className="absolute right-0 top-11 w-52 rounded-xl border border-border-subtle bg-surface-container-high shadow-xl shadow-black/30 z-50 overflow-hidden animate-fade-in-up">
+                  <div className="px-4 py-3 border-b border-border-subtle">
+                    {session.user.name && (
+                      <p className="text-sm font-semibold text-on-surface truncate">{session.user.name}</p>
+                    )}
+                    <p className="text-xs text-text-secondary truncate">{session.user.email}</p>
+                  </div>
+                  <button
+                    id="logout-btn"
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                      <polyline points="16 17 21 12 16 7"/>
+                      <line x1="21" y1="12" x2="9" y2="12"/>
+                    </svg>
+                    Keluar
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <Link href="/login">
@@ -197,17 +246,73 @@ export default function LandingPage() {
       {/* Main Canvas */}
       <main className="flex-1 flex flex-col items-center justify-center px-gutter w-full max-w-container-max mx-auto py-section-gap relative z-10 pb-[100px]">
         {/* Hero Section */}
-        <div className="text-center mb-stack-lg w-full flex flex-col items-center">
-          <div className="inline-flex items-center gap-stack-sm mb-stack-sm">
-            <h1 className="text-headline-lg-mobile md:text-headline-xl font-headline-lg-mobile md:font-headline-xl text-on-surface tracking-tight">
-              Mau bangun produk apa?
-            </h1>
-            <FileText className="text-primary w-8 h-8 md:w-10 md:h-10 opacity-90" />
-          </div>
+        <div className="text-center mb-8 w-full flex flex-col items-center">
+          <h1 className="text-headline-lg-mobile md:text-headline-xl font-headline-lg-mobile md:font-headline-xl text-on-surface tracking-tight mb-3">
+            Rancang dokumen produkmu
+          </h1>
           <p className="text-body-sm md:text-body-lg font-body-sm md:font-body-lg text-text-secondary max-w-lg mx-auto leading-relaxed">
-            Ubah ide mentah Anda menjadi dokumen spesifikasi produk siap pakai berstandar industri dengan kecerdasan buatan.
+            Pilih jenis dokumen yang ingin kamu generate dengan AI.
           </p>
         </div>
+
+        {/* ─── Mode Selector Cards ─── */}
+        {selectedMode === null && (
+          <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 max-w-2xl">
+            {/* PRD Card */}
+            <button
+              id="select-prd-btn"
+              onClick={() => setSelectedMode("prd")}
+              className="group text-left p-6 rounded-xl border border-border-subtle bg-surface-container-high hover:border-primary/50 hover:bg-primary/5 transition-all duration-200 cursor-pointer hover:shadow-lg hover:shadow-primary/10 active:scale-[0.98]"
+            >
+              <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
+                <FileText className="w-5 h-5 text-primary" />
+              </div>
+              <h2 className="text-base font-bold text-on-surface mb-1.5 group-hover:text-primary transition-colors">
+                Generate PRD
+              </h2>
+              <p className="text-sm text-text-secondary leading-relaxed">
+                Ubah ide mentah menjadi Product Requirements Document lengkap siap pakai.
+              </p>
+              <div className="mt-4 text-xs text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                Mulai Generate →
+              </div>
+            </button>
+
+            {/* Stitch Card */}
+            <Link href="/stitch" id="select-stitch-btn">
+              <div className="group text-left p-6 rounded-xl border border-border-subtle bg-surface-container-high hover:border-secondary/60 hover:bg-secondary/5 transition-all duration-200 cursor-pointer hover:shadow-lg hover:shadow-secondary/10 active:scale-[0.98] h-full">
+                <div className="w-10 h-10 rounded-lg bg-secondary/10 border border-secondary/20 flex items-center justify-center mb-4 group-hover:bg-secondary/20 transition-colors">
+                  <Wand2 className="w-5 h-5 text-secondary-foreground" />
+                </div>
+                <h2 className="text-base font-bold text-on-surface mb-1.5 group-hover:text-secondary-foreground transition-colors">
+                  Generate DESIGN.md
+                </h2>
+                <p className="text-sm text-text-secondary leading-relaxed">
+                  Upload screenshot web & app, generate DESIGN.md lengkap + Stitch Prompt siap pakai.
+                </p>
+                <div className="mt-4 text-xs text-secondary-foreground font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                  Upload Screenshot →
+                </div>
+              </div>
+            </Link>
+          </div>
+        )}
+
+        {/* Back to mode selector when PRD mode is active */}
+        {selectedMode === "prd" && (
+          <div className="w-full flex items-center gap-3 mb-5">
+            <button
+              onClick={() => setSelectedMode(null)}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            >
+              ← Kembali
+            </button>
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-primary" />
+              <span className="text-sm font-semibold text-foreground">Generate PRD</span>
+            </div>
+          </div>
+        )}
 
         {/* ─── Error Banner ─── */}
         {errorMsg && pageState === "idle" && (
@@ -221,8 +326,8 @@ export default function LandingPage() {
           </div>
         )}
 
-        {/* ─── IDLE: Input Console ─── */}
-        {pageState === "idle" && (
+        {/* ─── IDLE: Input Console — only shown when PRD mode selected ─── */}
+        {pageState === "idle" && selectedMode === "prd" && (
           <div className="w-full bg-surface-container-high rounded-xl border border-border-subtle p-6 relative focus-within:border-primary/60 focus-within:ring-1 focus-within:ring-primary/20 transition-all duration-300 shadow-lg group">
             <Textarea
               ref={textareaRef}
