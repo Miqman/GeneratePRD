@@ -56,8 +56,6 @@ export default function StitchPage() {
     }
   }, [isPending, session, router]);
 
-  if (isPending || !session?.user) return null;
-
   const addImages = (files: FileList | File[]) => {
     const fileArr = Array.from(files);
     const remaining = 5 - images.length;
@@ -94,11 +92,12 @@ export default function StitchPage() {
     });
   };
 
+  // ⚠️ useCallback HARUS sebelum early return agar tidak melanggar Rules of Hooks
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files) addImages(e.dataTransfer.files);
-  }, [images]);
+  }, [images]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -107,7 +106,11 @@ export default function StitchPage() {
 
   const handleDragLeave = () => setIsDragging(false);
 
+  // Early return SETELAH semua hooks
+  if (isPending || !session?.user) return null;
+
   // Simulate step progress during analysis
+
   const simulateSteps = () => {
     const delays = [800, 1600, 2400, 3600, 4800];
     delays.forEach((delay, i) => {

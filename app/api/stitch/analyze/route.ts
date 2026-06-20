@@ -7,6 +7,11 @@ import { STITCH_SYSTEM_PROMPT, buildStitchUserPrompt } from "@/lib/stitch-prompt
 const MAX_IMAGES = 5;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
+// 9router config — gunakan model khusus vision (comboGemini)
+const BASE_URL = process.env.NINEROUTER_BASE_URL || "https://api.9router.com/v1";
+const API_KEY = process.env.NINEROUTER_API_KEY || "";
+const VISION_MODEL = process.env.NINEROUTER_VISION_MODEL || "comboGemini";
+
 export async function POST(req: NextRequest) {
   // Auth check
   const session = await auth.api.getSession({ headers: await headers() });
@@ -29,31 +34,34 @@ export async function POST(req: NextRequest) {
     }
     for (const file of imageFiles) {
       if (file.size > MAX_FILE_SIZE) {
-        return NextResponse.json({ error: `File "${file.name}" terlalu besar (max 10MB)` }, { status: 400 });
+        return NextResponse.json(
+          { error: `File "${file.name}" terlalu besar (max 10MB)` },
+          { status: 400 }
+        );
       }
       const validTypes = ["image/png", "image/jpeg", "image/webp", "image/gif"];
       if (!validTypes.includes(file.type)) {
-        return NextResponse.json({ error: `Format file tidak didukung: ${file.type}` }, { status: 400 });
+        return NextResponse.json(
+          { error: `Format file tidak didukung: ${file.type}` },
+          { status: 400 }
+        );
       }
     }
 
-    // Convert images to base64 for Gemini Vision
-    const imageParts = await Promise.all(
+    // Convert images to base64 for OpenAI-compatible vision format
+    const imageContentParts = await Promise.all(
       imageFiles.map(async (file) => {
         const bytes = await file.arrayBuffer();
         const base64 = Buffer.from(bytes).toString("base64");
         return {
-          inlineData: {
-            mimeType: file.type,
-            data: base64,
+          type: "image_url",
+          image_url: {
+            url: `data:${file.type};base64,${base64}`,
+            detail: "high",
           },
         };
       })
     );
-
-    // Call Gemini Vision API
-    const model = process.env.GEMINI_MODEL || "gemini-1.5-pro";
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
 
     const userPrompt = buildStitchUserPrompt(
       imageFiles.length,
@@ -61,43 +69,56 @@ export async function POST(req: NextRequest) {
       description || undefined
     );
 
-    const geminiRes = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: {
-          parts: [{ text: STITCH_SYSTEM_PROMPT }],
-        },
-        contents: [
-          {
-            parts: [
-              { text: userPrompt },
-              ...imageParts,
-            ],
-          },
+    // Build messages with vision content (OpenAI-compatible multimodal format)
+    const messages = [
+      { role: "system", content: STITCH_SYSTEM_PROMPT },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: userPrompt },
+          ...imageContentParts,
         ],
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 8192,
-        },
+      },
+    ];
+
+    // Call 9router with comboGemini model
+    const res = await fetch(`${BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: VISION_MODEL,
+        messages,
+        temperature: 0.3,
+        max_tokens: 8192,
+        stream: false,
       }),
     });
 
-    if (!geminiRes.ok) {
-      const errBody = await geminiRes.text();
-      console.error("Gemini Vision error:", errBody);
-      throw new Error(`Gemini Vision API error: ${geminiRes.statusText}`);
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => res.statusText);
+      console.error("[stitch] 9router error:", errBody);
+      throw new Error(`9router API error [${res.status}]: ${errBody}`);
     }
 
-    const geminiData = await geminiRes.json();
-    const rawText: string = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const resData = await res.json();
+    const rawText: string =
+      resData?.choices?.[0]?.message?.content ??
+      resData?.choices?.[0]?.text ??
+      resData?.content ??
+      "";
 
-    // Parse JSON from AI response
+    if (!rawText) {
+      throw new Error("AI tidak menghasilkan output. Coba lagi.");
+    }
+
+    // Parse JSON from AI response (handle markdown code blocks)
     let designMd = "";
     let stitchPrompt = "";
 
     try {
-      // Try to extract JSON from the response (handle markdown code blocks)
       const jsonMatch =
         rawText.match(/```json\s*([\s\S]*?)```/) ||
         rawText.match(/```\s*([\s\S]*?)```/) ||
@@ -108,17 +129,15 @@ export async function POST(req: NextRequest) {
       designMd = parsed.designMd || "";
       stitchPrompt = parsed.stitchPrompt || "";
     } catch {
-      // If JSON parsing fails, try to extract manually
-      console.warn("Could not parse JSON from Gemini response, using raw text");
+      console.warn("[stitch] Could not parse JSON from AI response, using raw text");
       designMd = rawText;
       stitchPrompt = "Could not extract stitch prompt — see DESIGN.md for full analysis.";
     }
 
     if (!designMd) {
-      throw new Error("AI tidak menghasilkan output yang valid. Coba lagi.");
+      throw new Error("AI tidak menghasilkan DESIGN.md yang valid. Coba lagi.");
     }
 
-    // Generate a unique session ID
     const sessionId = `stitch_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
     return NextResponse.json({
@@ -129,10 +148,11 @@ export async function POST(req: NextRequest) {
         screenshotCount: imageFiles.length,
         projectName: projectName || null,
         analyzedAt: new Date().toISOString(),
+        model: VISION_MODEL,
       },
     });
   } catch (err) {
-    console.error("Stitch analyze error:", err);
+    console.error("[stitch] analyze error:", err);
     const message = err instanceof Error ? err.message : "Terjadi kesalahan server";
     return NextResponse.json({ error: message }, { status: 500 });
   }
