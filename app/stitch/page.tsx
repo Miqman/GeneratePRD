@@ -385,7 +385,7 @@ export default function StitchPage() {
             <div className="rounded-xl border border-border/50 bg-surface-container-high/30 p-4">
               <div className="flex items-center gap-2.5 mb-2">
                 <div className="w-8 h-8 rounded-lg bg-secondary/20 flex items-center justify-center">
-                  <Wand2 className="w-4 h-4 text-secondary-foreground" />
+                  <Wand2 className="w-4 h-4 text-secondary" />
                 </div>
                 <span className="font-semibold text-sm text-foreground">Stitch Prompt</span>
               </div>

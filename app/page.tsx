@@ -192,12 +192,12 @@ export default function LandingPage() {
           </Link>
         </div>
         <div className="flex items-center gap-stack-md">
-          <span className="text-label-sm font-label-sm bg-surface-container-high px-3 py-1 rounded-full border border-border-subtle text-text-secondary hidden md:inline-block">
+          {/* <span className="text-label-sm font-label-sm bg-surface-container-high px-3 py-1 rounded-full border border-border-subtle text-text-secondary hidden md:inline-block">
             Free
           </span>
           <button className="bg-secondary text-on-secondary text-label-md font-label-md px-4 py-2 rounded-lg transition-colors duration-200 shadow-[0_0_15px_rgba(255,185,95,0.15)] hover:bg-secondary-fixed active:scale-95 cursor-pointer">
             Upgrade
-          </button>
+          </button> */}
           {session?.user ? (
             <div ref={userMenuRef} className="relative">
               <button
@@ -282,15 +282,15 @@ export default function LandingPage() {
             <Link href="/stitch" id="select-stitch-btn">
               <div className="group text-left p-6 rounded-xl border border-border-subtle bg-surface-container-high hover:border-secondary/60 hover:bg-secondary/5 transition-all duration-200 cursor-pointer hover:shadow-lg hover:shadow-secondary/10 active:scale-[0.98] h-full">
                 <div className="w-10 h-10 rounded-lg bg-secondary/10 border border-secondary/20 flex items-center justify-center mb-4 group-hover:bg-secondary/20 transition-colors">
-                  <Wand2 className="w-5 h-5 text-secondary-foreground" />
+                  <Wand2 className="w-5 h-5 text-secondary" />
                 </div>
-                <h2 className="text-base font-bold text-on-surface mb-1.5 group-hover:text-secondary-foreground transition-colors">
+                <h2 className="text-base font-bold text-on-surface mb-1.5 group-hover:text-secondary transition-colors">
                   Generate DESIGN.md
                 </h2>
                 <p className="text-sm text-text-secondary leading-relaxed">
                   Upload screenshot web & app, generate DESIGN.md lengkap + Stitch Prompt siap pakai.
                 </p>
-                <div className="mt-4 text-xs text-secondary-foreground font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                <div className="mt-4 text-xs text-secondary font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
                   Upload Screenshot →
                 </div>
               </div>
