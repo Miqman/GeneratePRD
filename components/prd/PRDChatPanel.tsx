@@ -55,7 +55,7 @@ export function PRDChatPanel({
   };
 
   return (
-    <aside className="w-72 xl:w-80 shrink-0 border-l border-border/60 bg-card/20 flex flex-col overflow-hidden">
+    <aside className="w-full md:w-72 xl:w-80 shrink-0 md:border-l border-border/60 bg-card/20 flex flex-col overflow-hidden h-full">
       {/* Header */}
       <div className="px-4 py-3 border-b border-border/40 shrink-0">
         <div className="flex items-center gap-2">

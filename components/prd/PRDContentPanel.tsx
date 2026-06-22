@@ -181,7 +181,7 @@ export function PRDContentPanel({
       >
         <div
           ref={containerRef}
-          className="max-w-3xl mx-auto px-6 md:px-10 py-8 animate-fade-in-up"
+          className="max-w-3xl mx-auto px-4 sm:px-6 md:px-10 py-8 animate-fade-in-up"
         >
           {viewMode === "preview" ? (
             <div className="prd-content">

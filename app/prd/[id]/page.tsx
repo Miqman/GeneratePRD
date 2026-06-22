@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, use, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Menu, Eye, Code2, Download, Copy, ChevronDown, Loader2, Check } from "lucide-react";
+import { Menu, Eye, Code2, Download, Copy, ChevronDown, Loader2, Check, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -44,6 +44,7 @@ export default function PRDEditorPage({
   const [viewMode, setViewMode] = useState<ViewMode>("preview");
   const [copied, setCopied] = useState(false);
   const [activeSection, setActiveSection] = useState("overview");
+  const [activeTab, setActiveTab] = useState<"document" | "chat">("document");
   const previousPrdRef = useRef<PRDVersion | null>(null);
   const conversationHistoryRef = useRef<Array<{ role: string; content: string }>>([]);
 
@@ -331,7 +332,7 @@ export default function PRDEditorPage({
             <TooltipTrigger
               id="code-view-btn"
               onClick={() => setViewMode("code")}
-              className={`w-8 h-8 flex items-center justify-center rounded-md transition-colors cursor-pointer ${viewMode === "code" ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+              className={`w-8 h-8 hidden sm:flex items-center justify-center rounded-md transition-colors cursor-pointer ${viewMode === "code" ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
             >
               <Code2 className="w-4 h-4" />
             </TooltipTrigger>
@@ -371,6 +372,37 @@ export default function PRDEditorPage({
         </div>
       </header>
 
+      {/* Mobile tabs for switching between Document and Chat */}
+      <div className="flex md:hidden border-b border-border/60 bg-muted/10 shrink-0">
+        <button
+          onClick={() => setActiveTab("document")}
+          className={`flex-1 py-3 text-xs font-semibold border-b-2 transition-all flex items-center justify-center gap-2 ${
+            activeTab === "document"
+              ? "border-primary text-primary bg-primary/5"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Eye className="w-3.5 h-3.5" />
+          Dokumen
+        </button>
+        <button
+          onClick={() => setActiveTab("chat")}
+          className={`flex-1 py-3 text-xs font-semibold border-b-2 transition-all flex items-center justify-center gap-2 ${
+            activeTab === "chat"
+              ? "border-primary text-primary bg-primary/5"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <MessageSquare className="w-3.5 h-3.5" />
+          Diskusi
+          {chatMessages.length > 0 && (
+            <span className="ml-1 px-1.5 py-0.5 text-[9px] bg-primary text-primary-foreground rounded-full leading-none font-bold">
+              {chatMessages.length}
+            </span>
+          )}
+        </button>
+      </div>
+
       {/* Three-panel layout */}
       <div className="flex-1 flex overflow-hidden">
         {/* LEFT: Structure navigation */}
@@ -381,19 +413,23 @@ export default function PRDEditorPage({
         />
 
         {/* CENTER: PRD Content */}
-        <PRDContentPanel
-          content={currentVersion.content}
-          viewMode={viewMode}
-          onSectionVisible={setActiveSection}
-          isRevising={false}
-        />
+        <div className={`flex-1 min-h-0 ${activeTab === "document" ? "flex flex-col" : "hidden md:flex md:flex-col"}`}>
+          <PRDContentPanel
+            content={currentVersion.content}
+            viewMode={viewMode}
+            onSectionVisible={setActiveSection}
+            isRevising={false}
+          />
+        </div>
 
         {/* RIGHT: Chat */}
-        <PRDChatPanel
-          messages={chatMessages}
-          onChat={handleChat}
-          isStreaming={isStreaming}
-        />
+        <div className={`flex-1 md:flex-none ${activeTab === "chat" ? "flex flex-col" : "hidden md:flex md:flex-col"}`}>
+          <PRDChatPanel
+            messages={chatMessages}
+            onChat={handleChat}
+            isStreaming={isStreaming}
+          />
+        </div>
       </div>
     </div>
   );
