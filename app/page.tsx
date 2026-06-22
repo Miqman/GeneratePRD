@@ -25,6 +25,7 @@ import {
 import { useSession, signOut } from "@/lib/auth-client";
 import Link from "next/link";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 
 type PageState = "idle" | "clarifying" | "generating";
 
@@ -172,7 +173,7 @@ export default function LandingPage() {
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* TopNavBar */}
-      <header className="bg-background flex justify-between items-center w-full px-gutter py-4 z-50 sticky top-0 border-b border-border-subtle/40 backdrop-blur-md bg-opacity-90">
+      <header className="bg-background flex justify-between items-center w-full px-gutter py-4 z-50 sticky top-0 backdrop-blur-md bg-opacity-90">
         <div className="flex items-center gap-stack-sm">
           {/* Burger menu — only shown when logged in */}
           {session?.user && (
@@ -192,12 +193,7 @@ export default function LandingPage() {
           </Link>
         </div>
         <div className="flex items-center gap-stack-md">
-          {/* <span className="text-label-sm font-label-sm bg-surface-container-high px-3 py-1 rounded-full border border-border-subtle text-text-secondary hidden md:inline-block">
-            Free
-          </span>
-          <button className="bg-secondary text-on-secondary text-label-md font-label-md px-4 py-2 rounded-lg transition-colors duration-200 shadow-[0_0_15px_rgba(255,185,95,0.15)] hover:bg-secondary-fixed active:scale-95 cursor-pointer">
-            Upgrade
-          </button> */}
+          <ThemeToggle />
           {session?.user ? (
             <div ref={userMenuRef} className="relative">
               <button
@@ -223,9 +219,9 @@ export default function LandingPage() {
                     className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                      <polyline points="16 17 21 12 16 7"/>
-                      <line x1="21" y1="12" x2="9" y2="12"/>
+                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                      <polyline points="16 17 21 12 16 7" />
+                      <line x1="21" y1="12" x2="9" y2="12" />
                     </svg>
                     Keluar
                   </button>
@@ -425,18 +421,17 @@ export default function LandingPage() {
                       </span>
                       {qText}
                     </label>
-                    
+
                     {q.type === "choice" && q.choices && q.choices.length > 0 ? (
                       <div className="flex flex-wrap gap-2 pl-7">
                         {q.choices.map((choice) => (
                           <button
                             key={choice}
                             onClick={() => setAnswers((prev) => ({ ...prev, [q.text]: choice }))}
-                            className={`text-xs px-3.5 py-1.5 rounded-full border transition-colors cursor-pointer ${
-                              answers[q.text] === choice
+                            className={`text-xs px-3.5 py-1.5 rounded-full border transition-colors cursor-pointer ${answers[q.text] === choice
                                 ? "bg-primary text-on-primary border-primary font-medium shadow-[0_0_10px_rgba(94,237,137,0.2)]"
                                 : "bg-surface-container text-text-secondary border-border-subtle hover:border-primary/50"
-                            }`}
+                              }`}
                           >
                             {choice}
                           </button>

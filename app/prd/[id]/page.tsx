@@ -16,6 +16,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { PRDStructurePanel } from "@/components/prd/PRDStructurePanel";
 import { PRDContentPanel } from "@/components/prd/PRDContentPanel";
 import { PRDChatPanel } from "@/components/prd/PRDChatPanel";
@@ -313,6 +314,7 @@ export default function PRDEditorPage({
 
         {/* Right: Action Icons */}
         <div className="ml-auto flex items-center gap-1">
+          <ThemeToggle />
           {/* Preview toggle */}
           <Tooltip>
             <TooltipTrigger

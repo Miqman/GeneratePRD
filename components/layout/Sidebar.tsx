@@ -74,14 +74,14 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 <X className="w-4 h-4" />
               </button>
               <SheetTitle className="text-sm font-extrabold text-foreground tracking-tight">
-                prd<span className="text-primary">forge</span>.ai
+                Rancang<span className="text-primary">.ai</span>
               </SheetTitle>
             </div>
             <Link href="/" onClick={onClose}>
               <Button
                 id="new-prd-btn"
                 size="sm"
-                className="h-7 px-2.5 text-xs gap-1 bg-primary/15 hover:bg-primary/25 text-primary border border-primary/30 hover:border-primary/50"
+                className="h-7 px-2.5 text-xs gap-1 bg-primary/15 hover:bg-primary/25 text-primary border border-primary/30 hover:border-primary/50 cursor-pointer"
                 variant="ghost"
               >
                 <Plus className="w-3 h-3" />
@@ -126,22 +126,19 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                             key={session.id}
                             href={`/prd/${session.id}`}
                             onClick={onClose}
-                            className={`group flex items-start gap-2.5 rounded-lg px-3 py-2.5 transition-all ${
-                              isActive
+                            className={`group flex items-start gap-2.5 rounded-lg px-3 py-2.5 transition-all ${isActive
                                 ? "bg-primary/15 border border-primary/30"
                                 : "hover:bg-muted/60 border border-transparent"
-                            }`}
+                              }`}
                           >
                             <FileText
-                              className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${
-                                isActive ? "text-primary" : "text-muted-foreground"
-                              }`}
+                              className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${isActive ? "text-primary" : "text-muted-foreground"
+                                }`}
                             />
                             <div className="flex-1 min-w-0">
                               <p
-                                className={`text-xs font-medium leading-snug line-clamp-2 ${
-                                  isActive ? "text-foreground" : "text-muted-foreground"
-                                }`}
+                                className={`text-xs font-medium leading-snug line-clamp-2 ${isActive ? "text-foreground" : "text-muted-foreground"
+                                  }`}
                               >
                                 {session.title}
                               </p>

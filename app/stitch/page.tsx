@@ -15,6 +15,7 @@ import {
   FileCode2,
   Wand2,
 } from "lucide-react";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 
 type UploadedImage = {
   file: File;
@@ -56,33 +57,64 @@ export default function StitchPage() {
     }
   }, [isPending, session, router]);
 
-  const addImages = (files: FileList | File[]) => {
+  const addImages = useCallback((files: FileList | File[]) => {
     const fileArr = Array.from(files);
-    const remaining = 5 - images.length;
-    if (remaining <= 0) {
-      toast.error("Maksimal 5 screenshot");
-      return;
-    }
-    const toAdd = fileArr.slice(0, remaining);
-    const newImages: UploadedImage[] = [];
+    setImages((prev) => {
+      const remaining = 5 - prev.length;
+      if (remaining <= 0) {
+        toast.error("Maksimal 5 screenshot");
+        return prev;
+      }
+      const toAdd = fileArr.slice(0, remaining);
+      const newImages: UploadedImage[] = [];
 
-    for (const file of toAdd) {
-      if (!["image/png", "image/jpeg", "image/webp", "image/gif"].includes(file.type)) {
-        toast.error(`Format tidak didukung: ${file.name}`);
-        continue;
+      for (const file of toAdd) {
+        if (!["image/png", "image/jpeg", "image/webp", "image/gif"].includes(file.type)) {
+          toast.error(`Format tidak didukung: ${file.name}`);
+          continue;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+          toast.error(`File terlalu besar (max 10MB): ${file.name}`);
+          continue;
+        }
+        newImages.push({
+          file,
+          preview: URL.createObjectURL(file),
+          id: `${Date.now()}-${Math.random()}`,
+        });
       }
-      if (file.size > 10 * 1024 * 1024) {
-        toast.error(`File terlalu besar (max 10MB): ${file.name}`);
-        continue;
+      return [...prev, ...newImages];
+    });
+  }, []);
+
+  // Support paste image
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      if (isAnalyzing) return;
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      const pastedFiles: File[] = [];
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf("image") !== -1) {
+          const file = items[i].getAsFile();
+          if (file) {
+            pastedFiles.push(file);
+          }
+        }
       }
-      newImages.push({
-        file,
-        preview: URL.createObjectURL(file),
-        id: `${Date.now()}-${Math.random()}`,
-      });
-    }
-    setImages((prev) => [...prev, ...newImages]);
-  };
+
+      if (pastedFiles.length > 0) {
+        addImages(pastedFiles);
+        toast.success("Gambar berhasil ditempel (paste)!");
+      }
+    };
+
+    window.addEventListener("paste", handlePaste);
+    return () => {
+      window.removeEventListener("paste", handlePaste);
+    };
+  }, [isAnalyzing, addImages]);
 
   const removeImage = (id: string) => {
     setImages((prev) => {
@@ -181,6 +213,9 @@ export default function StitchPage() {
         </Link>
         <span className="text-border/80">·</span>
         <span className="text-sm text-muted-foreground">Stitch & DESIGN.md Generator</span>
+        <div className="ml-auto">
+          <ThemeToggle />
+        </div>
       </header>
 
       <main className="flex-1 flex flex-col items-center px-4 py-12 max-w-3xl mx-auto w-full">
@@ -236,10 +271,10 @@ export default function StitchPage() {
                   <ImagePlus className="w-7 h-7 text-primary/70" />
                 </div>
                 <p className="text-sm font-medium text-foreground mb-1">
-                  Drag & drop screenshot di sini
+                  Drag & drop atau tempel (paste) screenshot di sini
                 </p>
                 <p className="text-xs text-muted-foreground mb-3">
-                  atau klik untuk memilih file
+                  atau tekan Ctrl+V / klik untuk memilih file
                 </p>
                 <p className="text-xs text-muted-foreground/60">
                   PNG, JPG, WebP · Max 10MB per file · Hingga 5 screenshot

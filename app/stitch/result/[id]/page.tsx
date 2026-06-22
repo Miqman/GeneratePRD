@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
 
 type StitchResult = {
   sessionId: string;
@@ -201,6 +202,7 @@ export default function StitchResultPage({
 
         {/* Actions */}
         <div className="flex items-center gap-1.5 flex-1 justify-end">
+          <ThemeToggle />
           <Link href="/stitch">
             <button
               id="analyze-new-btn"
