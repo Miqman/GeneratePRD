@@ -450,7 +450,7 @@ const mockProvider: AIProvider = {
     };
   },
 
-  async clarify(prompt: string, language: "id" | "en"): Promise<string> {
+  async clarify(prompt: string, language: "id" | "en", _techStack?: string): Promise<string> {
     await new Promise((resolve) => setTimeout(resolve, 400));
     const isId = language === "id";
     // Mock: treat prompts under 60 chars as vague
@@ -472,6 +472,20 @@ const mockProvider: AIProvider = {
       });
     }
     return JSON.stringify({ needsClarification: false, complexity: "medium" });
+  },
+
+  async generateText(_systemPrompt: string, _userContent: string): Promise<string> {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    // Return mock tech stack JSON for testing
+    return JSON.stringify([
+      { layer: "Frontend", technology: "Next.js 15 (App Router)", reason: "SSR + RSC untuk performa optimal" },
+      { layer: "Styling", technology: "Tailwind CSS + shadcn/ui", reason: "Komponen siap pakai dengan customisasi penuh" },
+      { layer: "Backend", technology: "Next.js API Routes", reason: "Satu codebase, mudah deploy ke Vercel" },
+      { layer: "Database", technology: "PostgreSQL (Neon)", reason: "Relational, serverless, gratis untuk MVP" },
+      { layer: "ORM", technology: "Drizzle ORM", reason: "Type-safe queries, ringan, cepat" },
+      { layer: "Auth", technology: "Better Auth", reason: "Production-ready auth tanpa vendor lock-in" },
+      { layer: "Hosting", technology: "Vercel", reason: "Deploy otomatis dari GitHub, CDN global" },
+    ]);
   },
 };
 

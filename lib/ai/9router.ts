@@ -212,9 +212,12 @@ const ninerouterProvider: AIProvider = {
     }
   },
 
-  async clarify(prompt: string, language: "id" | "en"): Promise<string> {
+  async clarify(prompt: string, language: "id" | "en", techStack?: string): Promise<string> {
     const { CLARIFY_SYSTEM_PROMPT } = await import("@/lib/prd-prompt");
     // Use lower temperature for deterministic JSON output
+    const userContent = techStack
+      ? `Product description:\n${prompt}\n\nTech stack already chosen by user:\n${techStack}`
+      : prompt;
     const response = await fetch(`${BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
@@ -225,7 +228,7 @@ const ninerouterProvider: AIProvider = {
         model: MODEL,
         messages: [
           { role: "system", content: CLARIFY_SYSTEM_PROMPT(language) },
-          { role: "user", content: prompt },
+          { role: "user", content: userContent },
         ],
         temperature: 0.1,
         max_tokens: 512,
@@ -239,6 +242,34 @@ const ninerouterProvider: AIProvider = {
     const data = await response.json();
     return (
       data?.choices?.[0]?.message?.content ?? data?.content ?? data?.text ?? "{}"
+    );
+  },
+
+  async generateText(systemPrompt: string, userContent: string): Promise<string> {
+    const response = await fetch(`${BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent },
+        ],
+        temperature: 0.3,
+        max_tokens: 8192,
+        stream: false,
+      }),
+    });
+    if (!response.ok) {
+      const err = await response.text().catch(() => response.statusText);
+      throw new Error(`9router generateText error [${response.status}]: ${err}`);
+    }
+    const data = await response.json();
+    return (
+      data?.choices?.[0]?.message?.content ?? data?.content ?? data?.text ?? ""
     );
   },
 };

@@ -2,14 +2,11 @@
 
 import { useEffect, useState, useCallback, use, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Menu, Eye, Code2, Download, Copy, ChevronDown, Loader2, Check, MessageSquare } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Menu, Eye, Code2, Copy, Check, MessageSquare,
+  Map, ListTodo, FileText,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
@@ -20,12 +17,17 @@ import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { PRDStructurePanel } from "@/components/prd/PRDStructurePanel";
 import { PRDContentPanel } from "@/components/prd/PRDContentPanel";
 import { PRDChatPanel } from "@/components/prd/PRDChatPanel";
+import { RoadmapTab } from "@/components/prd/RoadmapTab";
+import { TaskBoard } from "@/components/prd/TaskBoard";
+import { ImplementasiDropdown } from "@/components/prd/ImplementasiDropdown";
+import { ForkButton } from "@/components/prd/ForkButton";
 import type { PRDSession, PRDVersion, ChatMessage } from "@/lib/types";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useSession } from "@/lib/auth-client";
 
 type ViewMode = "preview" | "code";
+type MainTab = "prd" | "roadmap" | "task" | "chat";
 
 export default function PRDEditorPage({
   params,
@@ -45,7 +47,7 @@ export default function PRDEditorPage({
   const [viewMode, setViewMode] = useState<ViewMode>("preview");
   const [copied, setCopied] = useState(false);
   const [activeSection, setActiveSection] = useState("overview");
-  const [activeTab, setActiveTab] = useState<"document" | "chat">("document");
+  const [mainTab, setMainTab] = useState<MainTab>("prd");
   const previousPrdRef = useRef<PRDVersion | null>(null);
   const conversationHistoryRef = useRef<Array<{ role: string; content: string }>>([]);
 
@@ -88,7 +90,6 @@ export default function PRDEditorPage({
     if (!message.trim() || isStreaming || !currentVersion) return;
     setIsStreaming(true);
 
-    // Optimistic: add user message to chat UI
     const tempUserMsg: ChatMessage = {
       id: `temp-${Date.now()}`,
       sessionId: id,
@@ -98,7 +99,6 @@ export default function PRDEditorPage({
     };
     setChatMessages((prev) => [...prev, tempUserMsg]);
 
-    // Add to conversation history
     conversationHistoryRef.current = [
       ...conversationHistoryRef.current,
       { role: "user", content: message },
@@ -119,319 +119,265 @@ export default function PRDEditorPage({
       if (!res.ok) throw new Error("Agentic chat failed");
       const data = await res.json();
 
-      // Add assistant message to conversation history
       conversationHistoryRef.current = [
         ...conversationHistoryRef.current,
         { role: "assistant", content: data.message },
       ];
 
       if (data.type === "discussion") {
-        // Show AI discussion in chat
         const assistantMsg: ChatMessage = {
-          id: data.assistantMessageId || `assistant-${Date.now()}`,
+          id: `assist-${Date.now()}`,
           sessionId: id,
           role: "assistant",
           content: data.message,
           createdAt: new Date().toISOString(),
         };
-        // Replace temp user msg ID with server ID, add assistant msg
-        setChatMessages((prev) => [
-          ...prev.filter((m) => m.id !== tempUserMsg.id),
-          { ...tempUserMsg, id: `user-${Date.now()}` },
-          assistantMsg,
-        ]);
+        setChatMessages((prev) => [...prev, assistantMsg]);
       } else if (data.type === "edit") {
-        // Save previous version for undo
-        previousPrdRef.current = currentVersion;
+        if (data.updatedPrd && data.updatedPrd !== currentVersion.content) {
+          previousPrdRef.current = currentVersion;
+        }
 
-        // Update PRD immediately (optimistic)
-        const newVersion: PRDVersion = {
-          id: data.versionId,
-          sessionId: id,
-          versionNumber: data.versionNumber,
-          content: data.updatedPrd,
-          changeDescription: data.revisionSummary || "Revisi dari agentic chat",
-          createdAt: new Date().toISOString(),
-        };
-        setCurrentVersion(newVersion);
-        setSession((prev) =>
-          prev
-            ? { ...prev, versions: [newVersion, ...(prev.versions || [])] }
-            : prev
-        );
+        if (data.updatedPrd) {
+          const newVersion: PRDVersion = {
+            id: data.versionId || `local-${Date.now()}`,
+            sessionId: id,
+            versionNumber: (currentVersion?.versionNumber || 0) + 1,
+            content: data.updatedPrd,
+            changeDescription: data.revisionSummary || "Chat revision",
+            createdAt: new Date().toISOString(),
+          };
+          setCurrentVersion(newVersion);
+          setSession((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  versions: [newVersion, ...(prev.versions || [])],
+                }
+              : prev
+          );
+        }
 
-        // Show AI confirmation in chat
-        const assistantMsg: ChatMessage = {
-          id: data.assistantMessageId || `assistant-${Date.now()}`,
+        const editMsg: ChatMessage = {
+          id: `edit-${Date.now()}`,
           sessionId: id,
           role: "assistant",
-          content: data.message || `PRD diperbarui: ${data.revisionSummary}`,
+          content: data.message || "PRD telah diperbarui.",
           createdAt: new Date().toISOString(),
         };
-        setChatMessages((prev) => [
-          ...prev.filter((m) => m.id !== tempUserMsg.id),
-          { ...tempUserMsg, id: `user-${Date.now()}` },
-          assistantMsg,
-        ]);
+        setChatMessages((prev) => [...prev, editMsg]);
 
-        // Show toast with undo
-        const isDestructive = data.changeType === "destructive";
-        const toastFn = isDestructive ? toast.warning : toast.success;
-        toastFn(`PRD diperbarui: ${data.revisionSummary}`, {
-          action: {
-            label: "Undo",
-            onClick: () => {
-              if (previousPrdRef.current) {
-                setCurrentVersion(previousPrdRef.current);
-                toast.info("PRD dikembalikan ke versi sebelumnya");
-                previousPrdRef.current = null;
-              }
-            },
-          },
-          duration: 8000,
-        });
+        if (data.changeType === "destructive") {
+          toast.warning("Perubahan besar diterapkan ke PRD");
+        } else {
+          toast.success("PRD berhasil diperbarui");
+        }
       }
-    } catch {
-      toast.error("Gagal memproses pesan. Silakan coba lagi.");
-      // Remove temp user message
-      setChatMessages((prev) => prev.filter((m) => m.id !== tempUserMsg.id));
-      // Remove from conversation history
-      conversationHistoryRef.current = conversationHistoryRef.current.slice(0, -1);
+    } catch (err) {
+      const errorMsg: ChatMessage = {
+        id: `err-${Date.now()}`,
+        sessionId: id,
+        role: "assistant",
+        content: "Maaf, terjadi kesalahan saat memproses permintaan Anda.",
+        createdAt: new Date().toISOString(),
+      };
+      setChatMessages((prev) => [...prev, errorMsg]);
     } finally {
       setIsStreaming(false);
     }
   };
 
-  const handleCopy = async () => {
+  const handleCopyMarkdown = async () => {
     if (!currentVersion?.content) return;
-    await navigator.clipboard.writeText(currentVersion.content);
-    setCopied(true);
-    toast.success("Markdown tersalin ke clipboard!");
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(currentVersion.content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Gagal menyalin teks");
+    }
   };
 
-  const handleDownload = () => {
-    if (!currentVersion?.content) return;
-    const blob = new Blob([currentVersion.content], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    const filename = (session?.title || "prd")
-      .slice(0, 30)
-      .replace(/[^a-zA-Z0-9\s]/g, "")
-      .trim()
-      .replace(/\s+/g, "-")
-      .toLowerCase();
-    a.download = `${filename}-v${currentVersion.versionNumber}.md`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    toast.success("File PRD berhasil diunduh!");
-  };
-
-  const versions = session?.versions || [];
+  const TAB_CONFIG: { key: MainTab; label: string; icon: React.ElementType }[] = [
+    { key: "prd", label: "PRD", icon: FileText },
+    { key: "roadmap", label: "Roadmap", icon: Map },
+    { key: "task", label: "Task", icon: ListTodo },
+    { key: "chat", label: "Chat", icon: MessageSquare },
+  ];
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="flex items-center gap-3 text-muted-foreground">
-          <Loader2 className="w-5 h-5 animate-spin" />
-          <span className="text-sm">Memuat PRD...</span>
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+            <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          </div>
+          <p className="text-sm text-text-secondary">Memuat PRD...</p>
         </div>
       </div>
     );
   }
 
-  if (!session || !currentVersion) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center space-y-3">
-          <p className="text-muted-foreground text-sm">PRD tidak ditemukan</p>
-          <Link href="/">
-            <Button variant="outline" size="sm">Kembali ke beranda</Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  if (!session) return null;
+
+  const prdContent = currentVersion?.content || "";
+  const language = (session.language as "id" | "en") || "id";
+  const displayTitle =
+    session.title.length > 40
+      ? session.title.slice(0, 40) + "…"
+      : session.title;
 
   return (
-    <div className="h-screen bg-background flex flex-col overflow-hidden">
-      {/* Sidebar */}
+    <div className="min-h-screen bg-background text-text-primary flex flex-col font-body-md overflow-hidden">
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      {/* Navbar */}
-      <header className="flex items-center gap-3 px-4 py-2.5 border-b border-border/60 bg-card/50 backdrop-blur-sm shrink-0 z-10">
-        {/* Left: Burger + Logo */}
-        <div className="flex items-center gap-2.5 min-w-0">
-          <Button
-            id="sidebar-toggle"
-            variant="ghost"
-            size="sm"
-            className="w-8 h-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
+      {/* ─── Navbar ─── */}
+      <header className="flex items-center justify-between px-4 h-14 border-b border-border-subtle shrink-0 gap-3 z-40 relative bg-background">
+        {/* Left */}
+        <div className="flex items-center gap-3 min-w-0">
+          <button
             onClick={() => setSidebarOpen(true)}
+            className="w-8 h-8 flex items-center justify-center rounded-md text-text-secondary hover:text-foreground hover:bg-surface-container-high transition-colors cursor-pointer shrink-0"
           >
             <Menu className="w-4 h-4" />
-          </Button>
-          <Link href="/" className="flex items-center gap-1.5 shrink-0">
-            <span className="font-extrabold text-foreground text-sm tracking-tight hidden sm:block">
-              Rancang<span className="text-primary">.ai</span>
-            </span>
+          </button>
+          <Link href="/" className="text-sm font-extrabold text-on-surface tracking-tight shrink-0">
+            Rancang<span className="text-primary">.ai</span>
           </Link>
-
-          {/* Version Selector */}
-          {versions.length > 0 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                id="version-selector"
-                className="inline-flex items-center gap-1.5 h-7 px-2.5 text-xs border border-border/60 bg-secondary/30 hover:bg-secondary text-foreground rounded-md transition-colors cursor-pointer"
-              >
-                <span className="text-muted-foreground">Version</span>
-                {currentVersion.versionNumber}
-                <ChevronDown className="w-3 h-3 text-muted-foreground" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="min-w-[200px]">
-                {versions.map((v) => (
-                  <DropdownMenuItem
-                    key={v.id}
-                    onClick={() => handleVersionSelect(v)}
-                    className={`text-xs gap-2 ${currentVersion.id === v.id ? "text-primary" : ""}`}
-                  >
-                    <span className="font-medium shrink-0">v{v.versionNumber}</span>
-                    <span className="text-muted-foreground truncate">
-                      {v.changeDescription || "Versi awal"}
-                    </span>
-                    {currentVersion.id === v.id && (
-                      <Check className="w-3 h-3 ml-auto shrink-0 text-primary" />
-                    )}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+          <span className="text-border-subtle hidden sm:block">·</span>
+          <span className="text-sm text-text-secondary truncate hidden sm:block max-w-[200px]">
+            {displayTitle}
+          </span>
+          {/* Version badge */}
+          {session.versions && session.versions.length > 0 && (
+            <span className="text-xs bg-surface-container border border-border-subtle text-text-secondary px-2 py-0.5 rounded-full shrink-0 hidden md:block">
+              v{currentVersion?.versionNumber || 1}
+            </span>
           )}
         </div>
 
-        {/* Right: Action Icons */}
-        <div className="ml-auto flex items-center gap-1">
+        {/* Right */}
+        <div className="flex items-center gap-2 shrink-0">
           <ThemeToggle />
-          {/* Preview toggle */}
-          <Tooltip>
-            <TooltipTrigger
-              id="preview-btn"
-              onClick={() => setViewMode(viewMode === "preview" ? "code" : "preview")}
-              className={`w-8 h-8 flex items-center justify-center rounded-md transition-colors cursor-pointer ${viewMode === "preview" ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
-            >
-              {viewMode === "preview" ? <Eye className="w-4 h-4" /> : <Code2 className="w-4 h-4" />}
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="text-xs">
-              {viewMode === "preview" ? "Lihat kode (Markdown)" : "Lihat preview"}
-            </TooltipContent>
-          </Tooltip>
-
-          {/* Code view */}
-          <Tooltip>
-            <TooltipTrigger
-              id="code-view-btn"
-              onClick={() => setViewMode("code")}
-              className={`w-8 h-8 hidden sm:flex items-center justify-center rounded-md transition-colors cursor-pointer ${viewMode === "code" ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
-            >
-              <Code2 className="w-4 h-4" />
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="text-xs">Lihat kode Markdown</TooltipContent>
-          </Tooltip>
-
-          {/* Download */}
-          <Tooltip>
-            <TooltipTrigger
-              id="download-btn"
-              onClick={handleDownload}
-              className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-            >
-              <Download className="w-4 h-4" />
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="text-xs">Unduh sebagai .md</TooltipContent>
-          </Tooltip>
-
-          {/* Copy */}
-          <Tooltip>
-            <TooltipTrigger
-              id="copy-btn"
-              onClick={handleCopy}
-              className={`w-8 h-8 flex items-center justify-center rounded-md transition-colors cursor-pointer ${copied ? "text-green-400 bg-green-400/10" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
-            >
-              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="text-xs">Salin Markdown</TooltipContent>
-          </Tooltip>
-
-          {/* User avatar */}
-          {authSession?.user && (
-            <div className="w-7 h-7 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-primary text-xs font-semibold ml-1">
-              {(authSession.user.name || authSession.user.email || "U")[0].toUpperCase()}
-            </div>
-          )}
+          <ForkButton sessionId={id} />
+          <ImplementasiDropdown
+            sessionId={id}
+            prdContent={prdContent}
+            title={session.title}
+            language={language}
+          />
         </div>
       </header>
 
-      {/* Mobile tabs for switching between Document and Chat */}
-      <div className="flex md:hidden border-b border-border/60 bg-muted/10 shrink-0">
-        <button
-          onClick={() => setActiveTab("document")}
-          className={`flex-1 py-3 text-xs font-semibold border-b-2 transition-all flex items-center justify-center gap-2 ${
-            activeTab === "document"
-              ? "border-primary text-primary bg-primary/5"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <Eye className="w-3.5 h-3.5" />
-          Dokumen
-        </button>
-        <button
-          onClick={() => setActiveTab("chat")}
-          className={`flex-1 py-3 text-xs font-semibold border-b-2 transition-all flex items-center justify-center gap-2 ${
-            activeTab === "chat"
-              ? "border-primary text-primary bg-primary/5"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <MessageSquare className="w-3.5 h-3.5" />
-          Diskusi
-          {chatMessages.length > 0 && (
-            <span className="ml-1 px-1.5 py-0.5 text-[9px] bg-primary text-primary-foreground rounded-full leading-none font-bold">
-              {chatMessages.length}
-            </span>
-          )}
-        </button>
+      {/* ─── Tab Bar ─── */}
+      <div className="flex items-center gap-1 px-4 border-b border-border-subtle shrink-0 bg-background z-30">
+        {TAB_CONFIG.map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            id={`tab-${key}`}
+            onClick={() => setMainTab(key)}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-all cursor-pointer -mb-px ${
+              mainTab === key
+                ? "border-primary text-primary"
+                : "border-transparent text-text-secondary hover:text-on-surface hover:border-border-subtle"
+            }`}
+          >
+            <Icon className="w-4 h-4" />
+            {label}
+          </button>
+        ))}
       </div>
 
-      {/* Three-panel layout */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* LEFT: Structure navigation */}
-        <PRDStructurePanel
-          content={currentVersion.content}
-          activeSection={activeSection}
-          onSectionClick={setActiveSection}
-        />
+      {/* ─── Tab Content ─── */}
+      <div className="flex-1 flex overflow-hidden min-h-0">
 
-        {/* CENTER: PRD Content */}
-        <div className={`flex-1 min-h-0 ${activeTab === "document" ? "flex flex-col" : "hidden md:flex md:flex-col"}`}>
-          <PRDContentPanel
-            content={currentVersion.content}
-            viewMode={viewMode}
-            onSectionVisible={setActiveSection}
-            isRevising={false}
-          />
-        </div>
+        {/* PRD Tab */}
+        {mainTab === "prd" && (
+          <>
+            {/* Structure Panel */}
+            <div className="w-56 shrink-0 border-r border-border-subtle hidden lg:flex flex-col overflow-hidden">
+              <PRDStructurePanel
+                content={prdContent}
+                activeSection={activeSection}
+                onSectionClick={setActiveSection}
+              />
+            </div>
 
-        {/* RIGHT: Chat */}
-        <div className={`flex-1 md:flex-none ${activeTab === "chat" ? "flex flex-col" : "hidden md:flex md:flex-col"}`}>
-          <PRDChatPanel
-            messages={chatMessages}
-            onChat={handleChat}
-            isStreaming={isStreaming}
-          />
-        </div>
+            {/* Content Panel */}
+            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+              {/* Toolbar */}
+              <div className="flex items-center justify-between px-4 py-2 border-b border-border-subtle shrink-0">
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setViewMode("preview")}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                      viewMode === "preview"
+                        ? "bg-surface-container text-on-surface"
+                        : "text-text-secondary hover:text-on-surface"
+                    }`}
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    Preview
+                  </button>
+                  <button
+                    onClick={() => setViewMode("code")}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                      viewMode === "code"
+                        ? "bg-surface-container text-on-surface"
+                        : "text-text-secondary hover:text-on-surface"
+                    }`}
+                  >
+                    <Code2 className="w-3.5 h-3.5" />
+                    Markdown
+                  </button>
+                </div>
+
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <button
+                        onClick={handleCopyMarkdown}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-text-secondary hover:text-on-surface transition-colors cursor-pointer"
+                      >
+                        {copied ? <Check className="w-3.5 h-3.5 text-primary" /> : <Copy className="w-3.5 h-3.5" />}
+                        {copied ? "Tersalin" : "Salin"}
+                      </button>
+                    }
+                  />
+                  <TooltipContent>Salin sebagai Markdown</TooltipContent>
+                </Tooltip>
+              </div>
+
+              <PRDContentPanel
+                content={prdContent}
+                viewMode={viewMode}
+                onSectionVisible={setActiveSection}
+                isRevising={isStreaming}
+              />
+            </div>
+          </>
+        )}
+
+        {/* Roadmap Tab */}
+        {mainTab === "roadmap" && (
+          <RoadmapTab sessionId={id} />
+        )}
+
+        {/* Task Tab */}
+        {mainTab === "task" && (
+          <TaskBoard sessionId={id} />
+        )}
+
+        {/* Chat Tab */}
+        {mainTab === "chat" && (
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+            <PRDChatPanel
+              messages={chatMessages}
+              onChat={handleChat}
+              isStreaming={isStreaming}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

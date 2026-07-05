@@ -228,8 +228,11 @@ const openaiProvider: AIProvider = {
     }
   },
 
-  async clarify(prompt: string, language: "id" | "en"): Promise<string> {
+  async clarify(prompt: string, language: "id" | "en", techStack?: string): Promise<string> {
     const { CLARIFY_SYSTEM_PROMPT } = await import("@/lib/prd-prompt");
+    const userContent = techStack
+      ? `Product description:\n${prompt}\n\nTech stack already chosen by user:\n${techStack}`
+      : prompt;
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -240,10 +243,32 @@ const openaiProvider: AIProvider = {
         model: process.env.OPENAI_MODEL || "gpt-4o",
         messages: [
           { role: "system", content: CLARIFY_SYSTEM_PROMPT(language) },
-          { role: "user", content: prompt },
+          { role: "user", content: userContent },
         ],
         temperature: 0.1,
         max_tokens: 512,
+      }),
+    });
+    if (!response.ok) throw new Error(`OpenAI API error: ${response.statusText}`);
+    const data = await response.json();
+    return data.choices[0].message.content;
+  },
+
+  async generateText(systemPrompt: string, userContent: string): Promise<string> {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: process.env.OPENAI_MODEL || "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent },
+        ],
+        temperature: 0.3,
+        max_tokens: 8192,
       }),
     });
     if (!response.ok) throw new Error(`OpenAI API error: ${response.statusText}`);

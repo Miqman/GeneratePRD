@@ -5,6 +5,8 @@ import {
   prdSessions,
   prdVersions,
   chatMessages,
+  prdFeatures,
+  prdTasks,
   sessions,
   accounts,
 } from "./schema";
@@ -22,6 +24,8 @@ export const prdSessionsRelations = relations(prdSessions, ({ one, many }) => ({
   }),
   versions: many(prdVersions),
   messages: many(chatMessages),
+  features: many(prdFeatures),
+  tasks: many(prdTasks),
 }));
 
 export const prdVersionsRelations = relations(prdVersions, ({ one }) => ({
@@ -35,6 +39,25 @@ export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
   session: one(prdSessions, {
     fields: [chatMessages.sessionId],
     references: [prdSessions.id],
+  }),
+}));
+
+export const prdFeaturesRelations = relations(prdFeatures, ({ one, many }) => ({
+  session: one(prdSessions, {
+    fields: [prdFeatures.sessionId],
+    references: [prdSessions.id],
+  }),
+  tasks: many(prdTasks),
+}));
+
+export const prdTasksRelations = relations(prdTasks, ({ one }) => ({
+  session: one(prdSessions, {
+    fields: [prdTasks.sessionId],
+    references: [prdSessions.id],
+  }),
+  feature: one(prdFeatures, {
+    fields: [prdTasks.featureId],
+    references: [prdFeatures.id],
   }),
 }));
 

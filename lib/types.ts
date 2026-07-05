@@ -8,11 +8,15 @@ export interface PRDSession {
   title: string;
   prompt: string;
   language: "id" | "en";
+  techStack?: TechStackEntry[] | null;
+  techStackMode?: "ai" | "self" | null;
   createdAt: string;
   updatedAt: string;
   versions?: PRDVersion[];
   messages?: ChatMessage[];
   currentVersion?: PRDVersion;
+  features?: RoadmapFeature[];
+  tasks?: PrdTask[];
 }
 
 export interface PRDVersion {
@@ -52,6 +56,8 @@ export interface GeneratePRDRequest {
   prompt: string;
   language: "id" | "en";
   complexity?: "simple" | "medium" | "complex";
+  techStack?: TechStackEntry[] | null;
+  techStackMode?: "ai" | "self" | null;
 }
 
 export interface RevisePRDRequest {
@@ -63,6 +69,75 @@ export interface PRDSection {
   title: string;
   anchor: string;
 }
+
+// ============================================================
+// Tech Stack
+// ============================================================
+
+export interface TechStackEntry {
+  layer: string;       // "Frontend", "Backend", "Database", dll
+  technology: string;  // "Next.js", "PostgreSQL", dll
+  reason: string;      // alasan pemilihan
+}
+
+export interface TechStackFormData {
+  frontend?: string;
+  backend?: string;
+  database?: string;
+  orm?: string;
+  auth?: string;
+  hosting?: string;
+  styling?: string;
+  [key: string]: string | undefined;
+}
+
+// ============================================================
+// Roadmap & Tasks
+// ============================================================
+
+export interface SubFeature {
+  name: string;
+  description: string;
+}
+
+export interface RoadmapFeature {
+  id: string;
+  sessionId: string;
+  name: string;
+  phase: string;           // "Fase 1"
+  priority: "high" | "medium" | "low";
+  description: string;
+  goal: string;
+  doneWhen: string[];
+  subFeatures: SubFeature[];
+  icon: string;            // lucide icon name
+  status: "planned" | "in_progress" | "done";
+  order: number;
+  taskCount?: number;
+  tasks?: PrdTask[];
+  createdAt: string;
+}
+
+export type TaskStatus = "belum_mulai" | "dikerjakan" | "selesai" | "gagal";
+export type TaskPriority = "utama" | "opsional";
+
+export interface PrdTask {
+  id: string;
+  sessionId: string;
+  featureId: string;
+  featureName: string;
+  title: string;
+  description: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ============================================================
+// PRD Sections (for sidebar navigation)
+// ============================================================
 
 export const PRD_SECTIONS: PRDSection[] = [
   { id: "overview", title: "1. Overview", anchor: "overview" },

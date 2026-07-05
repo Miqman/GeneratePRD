@@ -13,6 +13,10 @@ import {
   MessageSquareQuote,
   SkipForward,
   Wand2,
+  Bot,
+  Settings,
+  Check,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,8 +30,9 @@ import { useSession, signOut } from "@/lib/auth-client";
 import Link from "next/link";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import type { TechStackEntry } from "@/lib/types";
 
-type PageState = "idle" | "clarifying" | "generating";
+type FlowStep = "selectMode" | "input" | "techStack" | "techStackForm" | "clarify" | "generating";
 
 type Question = {
   text: string;
@@ -35,17 +40,90 @@ type Question = {
   choices?: string[];
 };
 
+// Tech stack layer definitions with chip options
+const TECH_LAYERS = [
+  {
+    key: "frontend",
+    label: "Frontend / Framework",
+    options: ["Next.js", "React", "Vue.js", "Svelte", "Nuxt.js"],
+  },
+  {
+    key: "backend",
+    label: "Backend / API",
+    options: ["Next.js API Routes", "Express.js", "Fastify", "NestJS", "Hono"],
+  },
+  {
+    key: "database",
+    label: "Database",
+    options: ["PostgreSQL", "MySQL", "SQLite", "MongoDB", "Supabase"],
+  },
+  {
+    key: "orm",
+    label: "ORM / Query Builder",
+    options: ["Drizzle ORM", "Prisma", "TypeORM", "Mongoose"],
+  },
+  {
+    key: "auth",
+    label: "Authentication",
+    options: ["Better Auth", "NextAuth.js", "Clerk", "Supabase Auth"],
+  },
+  {
+    key: "hosting",
+    label: "Hosting / Deployment",
+    options: ["Vercel", "Railway", "Fly.io", "VPS (Ubuntu)", "Netlify"],
+  },
+  {
+    key: "styling",
+    label: "Styling / UI",
+    options: ["Tailwind CSS + shadcn/ui", "Tailwind CSS", "Vanilla CSS", "Chakra UI"],
+  },
+] as const;
+
+type LayerKey = (typeof TECH_LAYERS)[number]["key"];
+
 export default function LandingPage() {
   const router = useRouter();
   const { data: session, isPending } = useSession();
+
+  // Flow state
+  const [flowStep, setFlowStep] = useState<FlowStep>("selectMode");
   const [prompt, setPrompt] = useState("");
   const [language, setLanguage] = useState<"id" | "en">("id");
-  const [pageState, setPageState] = useState<PageState>("idle");
   const [charCount, setCharCount] = useState(0);
+
+  // Tech stack state
+  const [techStackMode, setTechStackMode] = useState<"ai" | "self" | null>(null);
+  const [techStackForm, setTechStackForm] = useState<Record<LayerKey, string>>({
+    frontend: "",
+    backend: "",
+    database: "",
+    orm: "",
+    auth: "",
+    hosting: "",
+    styling: "",
+  });
+  const [customInputs, setCustomInputs] = useState<Record<LayerKey, string>>({
+    frontend: "",
+    backend: "",
+    database: "",
+    orm: "",
+    auth: "",
+    hosting: "",
+    styling: "",
+  });
+  const [aiTechStack, setAiTechStack] = useState<TechStackEntry[] | null>(null);
+
+  // Clarify state
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [complexity, setComplexity] = useState<"simple" | "medium" | "complex">("medium");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // UI state
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [selectedMode, setSelectedMode] = useState<"prd" | "stitch" | null>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -62,15 +140,6 @@ export default function LandingPage() {
     window.location.href = "/login";
   };
 
-  // Clarification state
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [complexity, setComplexity] = useState<"simple" | "medium" | "complex">("medium");
-
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  // Tunggu session selesai di-fetch sebelum memutuskan redirect
   if (isPending) return null;
 
   const handlePromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -78,53 +147,117 @@ export default function LandingPage() {
     setCharCount(e.target.value.length);
   };
 
-  /** Step 1: Hit /api/clarify, then decide whether to show questions or jump straight to generate */
-  const handleGenerate = async () => {
+  /** Step 0: Select mode card → show textarea */
+  const handleSelectPRD = () => {
+    setFlowStep("input");
+    // Focus textarea after render
+    setTimeout(() => textareaRef.current?.focus(), 50);
+  };
+
+  /** Step 1: Submit prompt → go to tech stack selection */
+  const handleSubmitPrompt = () => {
     if (!prompt.trim() || prompt.trim().length < 10) return;
     if (!session?.user) {
       router.push("/login");
       return;
     }
+    setFlowStep("techStack");
+  };
 
-    setPageState("generating"); // show spinner while clarifying
+  /** Step 2a: User chooses "AI pick stack" */
+  const handleSelectAiStack = async () => {
+    setTechStackMode("ai");
+    setFlowStep("generating"); // show spinner while fetching AI stack + clarify
 
     try {
-      const res = await fetch("/api/clarify", {
+      // Fetch AI-determined tech stack (fire and forget for display)
+      const stackRes = await fetch("/api/tech-stack", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: prompt.trim(), language }),
       });
+      if (stackRes.ok) {
+        const stackData = await stackRes.json();
+        setAiTechStack(stackData.techStack || null);
+      }
+    } catch {
+      // Not critical — AI stack preview is cosmetic
+    }
+
+    await runClarify(null);
+  };
+
+  /** Step 2b: User chooses "Fill own stack" → show form */
+  const handleSelectSelfStack = () => {
+    setTechStackMode("self");
+    setFlowStep("techStackForm");
+  };
+
+  /** Step 2b continued: Submit stack form → clarify */
+  const handleSubmitStackForm = async () => {
+    setFlowStep("generating");
+    await runClarify(buildTechStackEntries());
+  };
+
+  /** Build TechStackEntry[] from form selections */
+  const buildTechStackEntries = (): TechStackEntry[] => {
+    return TECH_LAYERS
+      .map((layer) => {
+        const selected = techStackForm[layer.key];
+        const custom = customInputs[layer.key].trim();
+        const technology = custom || selected;
+        return technology
+          ? { layer: layer.label, technology, reason: "Dipilih oleh developer" }
+          : null;
+      })
+      .filter(Boolean) as TechStackEntry[];
+  };
+
+  /** Run clarify API */
+  const runClarify = async (techStack: TechStackEntry[] | null) => {
+    try {
+      const res = await fetch("/api/clarify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: prompt.trim(),
+          language,
+          techStack: techStack || undefined,
+        }),
+      });
 
       const data = await res.json();
-
-      // Capture complexity from clarify response
       if (data.complexity && ["simple", "medium", "complex"].includes(data.complexity)) {
         setComplexity(data.complexity);
       }
 
       if (data.needsClarification && data.questions?.length > 0) {
-        // Show questions
         const formattedQuestions: Question[] = data.questions.map((q: any) =>
           typeof q === "string" ? { text: q, type: "open" } : q
         );
         setQuestions(formattedQuestions);
         setAnswers({});
-        setPageState("clarifying");
+        setFlowStep("clarify");
       } else {
-        // No clarification needed — generate directly
-        await doGenerate({});
+        await doGenerate({}, techStack);
       }
     } catch {
-      // If clarify fails, proceed to generate anyway
-      await doGenerate({});
+      await doGenerate({}, techStack);
     }
   };
 
-  /** Step 2: Actual generation call (with optional answers) */
-  const doGenerate = async (answersMap: Record<string, string>) => {
-    setPageState("generating");
+  /** Final generation */
+  const doGenerate = async (
+    answersMap: Record<string, string>,
+    techStack: TechStackEntry[] | null = null
+  ) => {
+    setFlowStep("generating");
     setErrorMsg(null);
     try {
+      const finalTechStack =
+        techStack ||
+        (techStackMode === "self" ? buildTechStackEntries() : aiTechStack);
+
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -133,19 +266,19 @@ export default function LandingPage() {
           language,
           answers: answersMap,
           complexity,
+          techStack: finalTechStack,
+          techStackMode,
         }),
       });
 
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data?.error || `HTTP ${res.status}`);
-      }
+      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
       router.push(`/prd/${data.sessionId}`);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error("doGenerate error:", msg);
       setErrorMsg(msg);
-      setPageState("idle");
+      setFlowStep("input");
     }
   };
 
@@ -155,18 +288,18 @@ export default function LandingPage() {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleGenerate();
+      handleSubmitPrompt();
     }
   };
 
-  const applyExample = (example: string) => {
-    setPrompt(example);
-    setCharCount(example.length);
-    textareaRef.current?.focus();
+  const goBack = () => {
+    if (flowStep === "input") setFlowStep("selectMode");
+    else if (flowStep === "techStack") setFlowStep("input");
+    else if (flowStep === "techStackForm") setFlowStep("techStack");
+    else if (flowStep === "clarify") setFlowStep(techStackMode === "self" ? "techStackForm" : "techStack");
   };
-  void applyExample; // suppress unused warning
 
-  const isGenerating = pageState === "generating";
+  const isGenerating = flowStep === "generating";
 
   return (
     <div className="min-h-screen bg-background text-text-primary flex flex-col font-body-md selection:bg-primary/30 selection:text-primary relative overflow-x-hidden">
@@ -175,7 +308,6 @@ export default function LandingPage() {
       {/* TopNavBar */}
       <header className="bg-background flex justify-between items-center w-full px-gutter py-4 z-50 sticky top-0 backdrop-blur-md bg-opacity-90">
         <div className="flex items-center gap-stack-sm">
-          {/* Burger menu — only shown when logged in */}
           {session?.user && (
             <button
               id="sidebar-toggle"
@@ -247,17 +379,41 @@ export default function LandingPage() {
             Rancang dokumen produkmu
           </h1>
           <p className="text-body-sm md:text-body-lg font-body-sm md:font-body-lg text-text-secondary max-w-lg mx-auto leading-relaxed">
-            Pilih jenis dokumen yang ingin kamu generate dengan AI.
+            {flowStep === "selectMode" && "Pilih jenis dokumen yang ingin kamu generate dengan AI."}
+            {flowStep === "input" && "Ceritakan ide proyekmu, AI akan membuat PRD lengkap untukmu."}
+            {flowStep === "techStack" && "Siapa yang tentukan tech stack project ini?"}
+            {flowStep === "techStackForm" && "Pilih teknologi yang ingin kamu gunakan."}
+            {flowStep === "clarify" && "Bantu AI pahami proyekmu lebih baik."}
+            {flowStep === "generating" && "AI sedang bekerja untuk kamu..."}
           </p>
         </div>
 
-        {/* ─── Mode Selector Cards ─── */}
-        {selectedMode === null && (
-          <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 max-w-2xl">
+        {/* ─── Step breadcrumb ─── */}
+        {flowStep !== "selectMode" && flowStep !== "generating" && (
+          <div className="flex items-center gap-2 mb-6 text-xs text-text-secondary">
+            <button onClick={goBack} className="hover:text-primary transition-colors cursor-pointer flex items-center gap-1">
+              ← Kembali
+            </button>
+            <span className="text-border-subtle">·</span>
+            <span className={flowStep === "input" ? "text-primary font-medium" : ""}>Prompt</span>
+            <ChevronRight className="w-3 h-3 opacity-40" />
+            <span className={flowStep === "techStack" || flowStep === "techStackForm" ? "text-primary font-medium" : ""}>
+              Tech Stack
+            </span>
+            <ChevronRight className="w-3 h-3 opacity-40" />
+            <span className={flowStep === "clarify" ? "text-primary font-medium" : ""}>Clarify</span>
+            <ChevronRight className="w-3 h-3 opacity-40" />
+            <span>Generate</span>
+          </div>
+        )}
+
+        {/* ─── STEP 0: Pilih Jenis Dokumen ─── */}
+        {flowStep === "selectMode" && (
+          <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl animate-fade-in-up">
             {/* PRD Card */}
             <button
               id="select-prd-btn"
-              onClick={() => setSelectedMode("prd")}
+              onClick={handleSelectPRD}
               className="group text-left p-6 rounded-xl border border-border-subtle bg-surface-container-high hover:border-primary/50 hover:bg-primary/5 transition-all duration-200 cursor-pointer hover:shadow-lg hover:shadow-primary/10 active:scale-[0.98]"
             >
               <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
@@ -270,7 +426,7 @@ export default function LandingPage() {
                 Ubah ide mentah menjadi Product Requirements Document lengkap siap pakai.
               </p>
               <div className="mt-4 text-xs text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                Mulai Generate →
+                Mulai buat PRD →
               </div>
             </button>
 
@@ -284,7 +440,7 @@ export default function LandingPage() {
                   Generate DESIGN.md
                 </h2>
                 <p className="text-sm text-text-secondary leading-relaxed">
-                  Upload screenshot web & app, generate DESIGN.md lengkap + Stitch Prompt siap pakai.
+                  Upload screenshot web &amp; app, generate DESIGN.md lengkap + Stitch Prompt siap pakai.
                 </p>
                 <div className="mt-4 text-xs text-secondary font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
                   Upload Screenshot →
@@ -294,75 +450,197 @@ export default function LandingPage() {
           </div>
         )}
 
-        {/* Back to mode selector when PRD mode is active */}
-        {selectedMode === "prd" && (
-          <div className="w-full flex items-center gap-3 mb-5">
-            <button
-              onClick={() => setSelectedMode(null)}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-            >
-              ← Kembali
-            </button>
-            <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-primary" />
-              <span className="text-sm font-semibold text-foreground">Generate PRD</span>
+        {/* ─── STEP 1: Input Prompt PRD ─── */}
+        {flowStep === "input" && (
+          <div className="w-full max-w-2xl animate-fade-in-up">
+            {/* Error Banner */}
+            {errorMsg && (
+              <div className="w-full mb-4 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 flex items-start gap-3">
+                <span className="text-red-400 text-sm mt-0.5">⚠</span>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-red-400">Gagal membuat PRD</p>
+                  <p className="text-xs text-red-400/70 mt-0.5 font-mono break-all">{errorMsg}</p>
+                </div>
+                <button onClick={() => setErrorMsg(null)} className="text-red-400/50 hover:text-red-400 text-xs cursor-pointer">✕</button>
+              </div>
+            )}
+
+            {/* Input Console */}
+            <div className="w-full bg-surface-container-high rounded-xl border border-border-subtle p-6 relative focus-within:border-primary/60 focus-within:ring-1 focus-within:ring-primary/20 transition-all duration-300 shadow-lg">
+              <Textarea
+                ref={textareaRef}
+                id="prompt-input"
+                value={prompt}
+                onChange={handlePromptChange}
+                onKeyDown={handleKeyDown}
+                placeholder="Contoh: 'Aplikasi pelacak keuangan harian terintegrasi dengan WhatsApp bot, memiliki dashboard grafik pengeluaran bulanan dan kategori otomatis...'"
+                className="w-full bg-transparent text-text-primary font-body-md text-body-md placeholder-text-secondary focus:ring-0 border-none resize-none p-0 outline-none leading-relaxed min-h-[120px]"
+              />
+              <div className="flex items-center justify-between mt-stack-md pt-stack-sm border-t border-border-subtle/50">
+                <Select value={language} onValueChange={(v) => setLanguage(v as "id" | "en")}>
+                  <SelectTrigger
+                    id="language-select"
+                    className="text-label-sm font-label-sm text-text-secondary hover:text-text-primary flex items-center gap-2 px-3 py-1.5 rounded bg-surface-container border border-border-subtle transition-colors cursor-pointer h-auto focus:ring-0 focus:ring-offset-0 focus-visible:ring-0"
+                  >
+                    <Globe className="w-4 h-4 opacity-70" />
+                    <span>{language === "id" ? "Bahasa Indonesia" : "English"}</span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="id" className="text-xs">Bahasa Indonesia</SelectItem>
+                    <SelectItem value="en" className="text-xs">English</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <div className="flex items-center gap-3">
+                  {charCount > 0 && (
+                    <span className="text-text-secondary opacity-60 text-xs">{charCount} karakter</span>
+                  )}
+                  <Button
+                    id="generate-btn"
+                    onClick={handleSubmitPrompt}
+                    disabled={prompt.trim().length < 10}
+                    className="bg-primary text-on-primary p-3 rounded-lg hover:bg-primary-fixed transition-all duration-200 hover:shadow-[0_0_20px_rgba(94,237,137,0.25)] active:scale-95 flex items-center justify-center w-10 h-10 shrink-0 cursor-pointer disabled:opacity-40"
+                  >
+                    <ArrowUp className="w-5 h-5 stroke-[2.5]" />
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         )}
 
-        {/* ─── Error Banner ─── */}
-        {errorMsg && pageState === "idle" && (
-          <div className="w-full mb-4 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 flex items-start gap-3">
-            <span className="text-red-400 text-sm mt-0.5">⚠</span>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-red-400">Gagal membuat PRD</p>
-              <p className="text-xs text-red-400/70 mt-0.5 font-mono break-all">{errorMsg}</p>
+        {/* ─── STEP: Tech Stack Selector ─── */}
+        {flowStep === "techStack" && (
+          <div className="w-full max-w-2xl animate-fade-in-up">
+            {/* Prompt preview */}
+            <div className="mb-6 px-4 py-3 bg-surface-container rounded-xl border border-border-subtle text-label-sm text-text-secondary line-clamp-2 italic">
+              &ldquo;{prompt}&rdquo;
             </div>
-            <button onClick={() => setErrorMsg(null)} className="text-red-400/50 hover:text-red-400 text-xs cursor-pointer">✕</button>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* AI Picks */}
+              <button
+                id="stack-ai-btn"
+                onClick={handleSelectAiStack}
+                className="group text-left p-6 rounded-xl border border-border-subtle bg-surface-container-high hover:border-primary/50 hover:bg-primary/5 transition-all duration-200 cursor-pointer hover:shadow-lg hover:shadow-primary/10 active:scale-[0.98]"
+              >
+                <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
+                  <Bot className="w-5 h-5 text-primary" />
+                </div>
+                <h2 className="text-base font-bold text-on-surface mb-1.5 group-hover:text-primary transition-colors">
+                  AI yang tentukan
+                </h2>
+                <p className="text-sm text-text-secondary leading-relaxed">
+                  AI pilih tech stack terbaik berdasarkan skala, tim, dan kebutuhan spesifik proyekmu.
+                </p>
+                <div className="mt-4 text-xs text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                  Biarkan AI pilihkan →
+                </div>
+              </button>
+
+              {/* Self Picks */}
+              <button
+                id="stack-self-btn"
+                onClick={handleSelectSelfStack}
+                className="group text-left p-6 rounded-xl border border-border-subtle bg-surface-container-high hover:border-secondary/60 hover:bg-secondary/5 transition-all duration-200 cursor-pointer hover:shadow-lg hover:shadow-secondary/10 active:scale-[0.98]"
+              >
+                <div className="w-10 h-10 rounded-lg bg-secondary/10 border border-secondary/20 flex items-center justify-center mb-4 group-hover:bg-secondary/20 transition-colors">
+                  <Settings className="w-5 h-5 text-secondary" />
+                </div>
+                <h2 className="text-base font-bold text-on-surface mb-1.5 group-hover:text-secondary transition-colors">
+                  Saya isi sendiri
+                </h2>
+                <p className="text-sm text-text-secondary leading-relaxed">
+                  Kontrol penuh atas pilihan teknologi. AI akan mengikuti stack yang kamu tentukan.
+                </p>
+                <div className="mt-4 text-xs text-secondary font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                  Pilih teknologi →
+                </div>
+              </button>
+            </div>
           </div>
         )}
 
-        {/* ─── IDLE: Input Console — only shown when PRD mode selected ─── */}
-        {pageState === "idle" && selectedMode === "prd" && (
-          <div className="w-full bg-surface-container-high rounded-xl border border-border-subtle p-6 relative focus-within:border-primary/60 focus-within:ring-1 focus-within:ring-primary/20 transition-all duration-300 shadow-lg group">
-            <Textarea
-              ref={textareaRef}
-              id="prompt-input"
-              value={prompt}
-              onChange={handlePromptChange}
-              onKeyDown={handleKeyDown}
-              placeholder="Contoh: 'Aplikasi pelacak keuangan harian terintegrasi dengan WhatsApp bot, memiliki dashboard grafik pengeluaran bulanan dan kategori otomatis...'"
-              className="w-full bg-transparent text-text-primary font-body-md text-body-md placeholder-text-secondary focus:ring-0 border-none resize-none p-0 outline-none leading-relaxed min-h-[100px]"
-            />
-            {/* Bottom Action Bar */}
-            <div className="flex items-center justify-between mt-stack-md pt-stack-sm border-t border-border-subtle/50">
-              {/* Language Selector */}
-              <Select value={language} onValueChange={(v) => setLanguage(v as "id" | "en")}>
-                <SelectTrigger
-                  id="language-select"
-                  className="text-label-sm font-label-sm text-text-secondary hover:text-text-primary flex items-center gap-2 px-3 py-1.5 rounded bg-surface-container border border-border-subtle transition-colors cursor-pointer h-auto focus:ring-0 focus:ring-offset-0 focus-visible:ring-0"
-                >
-                  <Globe className="w-4 h-4 opacity-70" />
-                  <span>{language === "id" ? "Bahasa Indonesia" : "English"}</span>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="id" className="text-xs">Bahasa Indonesia</SelectItem>
-                  <SelectItem value="en" className="text-xs">English</SelectItem>
-                </SelectContent>
-              </Select>
+        {/* ─── STEP: Tech Stack Form ─── */}
+        {flowStep === "techStackForm" && (
+          <div className="w-full max-w-2xl animate-fade-in-up">
+            <div className="bg-surface-container-high rounded-xl border border-border-subtle p-6 shadow-lg">
+              <h2 className="text-base font-semibold text-on-surface mb-5">Pilih tech stack kamu</h2>
+              <div className="space-y-5">
+                {TECH_LAYERS.map((layer) => (
+                  <div key={layer.key}>
+                    <p className="text-label-sm font-medium text-text-primary mb-2.5">{layer.label}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {layer.options.map((opt) => {
+                        const isSelected = techStackForm[layer.key] === opt && !customInputs[layer.key];
+                        return (
+                          <button
+                            key={opt}
+                            type="button"
+                            onClick={() => {
+                              setTechStackForm((prev) => ({ ...prev, [layer.key]: opt }));
+                              setCustomInputs((prev) => ({ ...prev, [layer.key]: "" }));
+                            }}
+                            className={`text-xs px-3.5 py-1.5 rounded-full border transition-all cursor-pointer flex items-center gap-1.5 ${
+                              isSelected
+                                ? "bg-primary text-on-primary border-primary font-medium shadow-[0_0_10px_rgba(94,237,137,0.2)]"
+                                : "bg-surface-container text-text-secondary border-border-subtle hover:border-primary/50"
+                            }`}
+                          >
+                            {isSelected && <Check className="w-3 h-3" />}
+                            {opt}
+                          </button>
+                        );
+                      })}
+                      {/* Custom input toggle */}
+                      {!customInputs[layer.key] ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCustomInputs((prev) => ({ ...prev, [layer.key]: " " }));
+                            setTechStackForm((prev) => ({ ...prev, [layer.key]: "" }));
+                          }}
+                          className="text-xs px-3.5 py-1.5 rounded-full border border-dashed border-border-subtle text-text-secondary hover:border-primary/40 transition-all cursor-pointer"
+                        >
+                          + Lainnya
+                        </button>
+                      ) : (
+                        <input
+                          type="text"
+                          autoFocus
+                          value={customInputs[layer.key].trim()}
+                          onChange={(e) =>
+                            setCustomInputs((prev) => ({ ...prev, [layer.key]: e.target.value }))
+                          }
+                          onBlur={() => {
+                            if (!customInputs[layer.key].trim()) {
+                              setCustomInputs((prev) => ({ ...prev, [layer.key]: "" }));
+                            }
+                          }}
+                          placeholder="Ketik nama teknologi..."
+                          className="text-xs px-3 py-1.5 rounded-full border border-primary/40 bg-surface-container text-text-primary outline-none focus:ring-1 focus:ring-primary/30 w-36"
+                        />
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
 
-              <div className="flex items-center gap-3">
-                {charCount > 0 && (
-                  <span className="text-text-secondary opacity-60 text-xs">{charCount} karakter</span>
-                )}
+              <div className="flex items-center gap-3 mt-6 pt-4 border-t border-border-subtle/50">
                 <Button
-                  id="generate-btn"
-                  onClick={handleGenerate}
-                  disabled={prompt.trim().length < 10}
-                  className="bg-primary text-on-primary p-3 rounded-lg hover:bg-primary-fixed transition-all duration-200 hover:shadow-[0_0_20px_rgba(94,237,137,0.25)] active:scale-95 flex items-center justify-center w-10 h-10 shrink-0 cursor-pointer disabled:opacity-40"
+                  id="stack-form-submit"
+                  onClick={handleSubmitStackForm}
+                  className="flex-1 bg-primary text-on-primary hover:bg-primary-fixed transition-all duration-200 hover:shadow-[0_0_20px_rgba(94,237,137,0.25)] active:scale-[0.98] cursor-pointer font-semibold"
                 >
-                  <ArrowUp className="w-5 h-5 stroke-[2.5]" />
+                  Lanjut ke Clarify
+                  <ChevronRight className="w-4 h-4 ml-1" />
                 </Button>
+                <button
+                  onClick={handleSubmitStackForm}
+                  className="text-xs text-text-secondary hover:text-text-primary transition-colors cursor-pointer px-3 py-2"
+                >
+                  Lewati
+                </button>
               </div>
             </div>
           </div>
@@ -386,7 +664,7 @@ export default function LandingPage() {
         )}
 
         {/* ─── CLARIFYING: Questions ─── */}
-        {pageState === "clarifying" && (
+        {flowStep === "clarify" && (
           <div className="w-full bg-surface-container-high rounded-xl border border-primary/30 p-6 shadow-lg animate-fade-in-up">
             {/* Header */}
             <div className="flex items-start gap-3 mb-5">
@@ -396,7 +674,8 @@ export default function LandingPage() {
               <div>
                 <p className="text-body-md font-semibold text-on-surface">Boleh saya tanya dulu?</p>
                 <p className="text-label-sm text-text-secondary mt-0.5">
-                  Jawaban ini membantu AI membuat PRD yang lebih akurat. <strong className="text-primary/80 font-medium">Jawab yang menurut Anda penting saja, tidak perlu semua.</strong>
+                  Jawaban ini membantu AI membuat PRD yang lebih akurat.{" "}
+                  <strong className="text-primary/80 font-medium">Jawab yang menurut Anda penting saja, tidak perlu semua.</strong>
                 </p>
               </div>
             </div>
@@ -428,10 +707,11 @@ export default function LandingPage() {
                           <button
                             key={choice}
                             onClick={() => setAnswers((prev) => ({ ...prev, [q.text]: choice }))}
-                            className={`text-xs px-3.5 py-1.5 rounded-full border transition-colors cursor-pointer ${answers[q.text] === choice
+                            className={`text-xs px-3.5 py-1.5 rounded-full border transition-colors cursor-pointer ${
+                              answers[q.text] === choice
                                 ? "bg-primary text-on-primary border-primary font-medium shadow-[0_0_10px_rgba(94,237,137,0.2)]"
                                 : "bg-surface-container text-text-secondary border-border-subtle hover:border-primary/50"
-                              }`}
+                            }`}
                           >
                             {choice}
                           </button>
@@ -485,19 +765,21 @@ export default function LandingPage() {
         )}
 
         {/* Secondary Action */}
-        <button
-          onClick={() => {
-            if (session?.user) {
-              setSidebarOpen(true);
-            } else {
-              router.push("/login");
-            }
-          }}
-          className="mt-stack-lg text-label-md font-label-md text-text-secondary hover:text-primary inline-flex items-center gap-stack-sm transition-colors duration-200 group cursor-pointer"
-        >
-          <History className="w-[18px] h-[18px] group-hover:text-primary transition-colors opacity-70 group-hover:opacity-100" />
-          <span>Lihat riwayat PRD sebelumnya</span>
-        </button>
+        {flowStep === "selectMode" && (
+          <button
+            onClick={() => {
+              if (session?.user) {
+                setSidebarOpen(true);
+              } else {
+                router.push("/login");
+              }
+            }}
+            className="mt-stack-lg text-label-md font-label-md text-text-secondary hover:text-primary inline-flex items-center gap-stack-sm transition-colors duration-200 group cursor-pointer"
+          >
+            <History className="w-[18px] h-[18px] group-hover:text-primary transition-colors opacity-70 group-hover:opacity-100" />
+            <span>Lihat riwayat PRD sebelumnya</span>
+          </button>
+        )}
       </main>
 
       {/* Footer */}

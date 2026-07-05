@@ -22,7 +22,9 @@ export interface AIProvider {
     language: "id" | "en"
   ): Promise<AgenticChatResult>;
   /** Evaluate if a prompt needs clarification. Returns raw JSON string from the model. */
-  clarify(prompt: string, language: "id" | "en"): Promise<string>;
+  clarify(prompt: string, language: "id" | "en", techStack?: string): Promise<string>;
+  /** Generic text generation with a system prompt and user content. Returns raw string from model. */
+  generateText(systemPrompt: string, userContent: string): Promise<string>;
 }
 
 // Factory: pilih provider berdasarkan env var AI_PROVIDER

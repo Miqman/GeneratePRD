@@ -5,7 +5,7 @@ import { CLARIFY_SYSTEM_PROMPT } from "@/lib/prd-prompt";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { prompt, language = "id" } = body;
+    const { prompt, language = "id", techStack } = body;
 
     if (!prompt || typeof prompt !== "string" || prompt.trim().length < 10) {
       return NextResponse.json(
@@ -16,9 +16,12 @@ export async function POST(request: NextRequest) {
 
     const aiProvider = await getAIProvider();
 
-    // Use generatePRD as a generic chat call by re-using the provider interface.
-    // We pass the clarify system prompt via a thin wrapper.
-    const raw = await aiProvider.clarify(prompt.trim(), language);
+    // If user already chose a tech stack, pass it as context so AI doesn't ask redundant stack questions
+    const techStackContext = techStack && Array.isArray(techStack)
+      ? techStack.map((s: { layer: string; technology: string }) => `${s.layer}: ${s.technology}`).join(", ")
+      : undefined;
+
+    const raw = await aiProvider.clarify(prompt.trim(), language, techStackContext);
 
     // Sanitise: strip any accidental markdown code fences the model may add
     const cleaned = raw

@@ -640,6 +640,98 @@ export const AGENTIC_UPDATE_PRD_TOOL = {
  *   });
  * }
  */
+/**
+ * Tech Stack AI Prompt.
+ * AI determines the best tech stack from the product description.
+ * Returns ONLY valid JSON — no markdown, no prose.
+ */
+export function TECH_STACK_AI_PROMPT(language: "id" | "en"): string {
+  const lang = language === "id" ? "Bahasa Indonesia" : "English";
+  return `You are a senior Technical Architect. Based on the product description provided, determine the most suitable tech stack.
+
+## Rules
+- Choose technologies that are modern, production-proven, and appropriate for the product scale.
+- Always include: Frontend/Framework, Backend/API, Database, Hosting/Deployment.
+- Include when relevant: Styling, UI Components, Auth, ORM, State Management, Cache, Storage, Email/Notifications, Queue, Search, Analytics, CI/CD, Monitoring.
+- Reasons must be specific to THIS product, not generic (not "popular" or "easy to use").
+- Respond in ${lang}.
+
+## Response Format
+Respond with ONLY valid JSON. No markdown. No prose. No code fences.
+
+[
+  { "layer": "Frontend", "technology": "Next.js 15 (App Router)", "reason": "SSR built-in cocok untuk landing page yang butuh SEO" },
+  { "layer": "Database", "technology": "PostgreSQL (Neon)", "reason": "Relational data cocok untuk booking system dengan transaksi kompleks" }
+]
+
+IMPORTANT:
+- Output must be a valid JSON array.
+- Each object must have exactly: "layer", "technology", "reason" (all strings).
+- 4 to 10 items maximum.
+- NO text before or after the JSON array.`;
+}
+
+/**
+ * Roadmap Generation Prompt.
+ * Takes PRD content and generates structured feature specs + tasks.
+ * Returns ONLY valid JSON — no markdown, no prose.
+ */
+export function ROADMAP_PROMPT(language: "id" | "en"): string {
+  const lang = language === "id" ? "Bahasa Indonesia" : "English";
+  return `You are a senior Technical Lead breaking down a PRD into a detailed implementation roadmap.
+
+## Task
+Read the PRD provided. Extract all features from the "Core Features" section. For each feature, generate:
+1. A complete feature specification (goal, done criteria, sub-features)
+2. A detailed task breakdown (implementation steps)
+
+## Rules
+- Use the EXACT feature names as they appear in the PRD Core Features section.
+- Map phases accurately: "MVP / Phase 1" → "Fase 1", "Phase 2" → "Fase 2", etc.
+- Priority mapping: features in Phase 1/MVP = "high", Phase 2 = "medium", Phase 3+ = "low"
+- Tasks: 5–15 per feature, ordered by implementation sequence (UI mockup/static → API → integration → polish)
+- Tasks should be atomic and actionable — each task is completable in 1–4 hours by a developer
+- doneWhen: 2–4 bullet points describing clear completion criteria
+- subFeatures: extract from the feature's bullet points in the PRD (1–5 sub-features)
+- icon: choose from these lucide icon names based on feature type:
+  Search, ShoppingCart, History, User, LayoutDashboard, Bell, Settings, Map, Calendar,
+  MessageSquare, CreditCard, Star, Package, FileText, BarChart, Shield, Zap, Globe, Layers
+- Respond in ${lang}.
+
+## Response Format
+Respond with ONLY valid JSON. No markdown. No prose. No code fences.
+The JSON must be an array of feature objects.
+
+[
+  {
+    "name": "Nama Fitur",
+    "phase": "Fase 1",
+    "priority": "high",
+    "description": "1-2 kalimat deskripsi fitur dari sudut pandang pengguna.",
+    "goal": "Tujuan utama fitur ini bagi pengguna dan bisnis.",
+    "doneWhen": [
+      "Kriteria selesai 1 yang spesifik dan terukur",
+      "Kriteria selesai 2"
+    ],
+    "subFeatures": [
+      { "name": "Nama Sub-fitur", "description": "Deskripsi singkat sub-fitur ini." }
+    ],
+    "icon": "Search",
+    "tasks": [
+      { "title": "Judul task singkat dan jelas", "description": "Deskripsi lebih panjang apa yang perlu dilakukan dalam task ini.", "priority": "utama" },
+      { "title": "Judul task 2", "description": "Deskripsi task 2.", "priority": "opsional" }
+    ]
+  }
+]
+
+IMPORTANT:
+- Output must be a valid JSON array only — no text before or after.
+- Every feature must have all fields: name, phase, priority, description, goal, doneWhen, subFeatures, icon, tasks.
+- Every task must have: title, description, priority ("utama" or "opsional").
+- doneWhen must be an array of strings (min 2).
+- subFeatures must be an array of objects with name and description.`;
+}
+
 export function parseAgenticResponse(response: any):
   | { type: "text"; text: string }
   | {
