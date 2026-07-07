@@ -246,7 +246,7 @@ const openaiProvider: AIProvider = {
           { role: "user", content: userContent },
         ],
         temperature: 0.1,
-        max_tokens: 512,
+        max_tokens: 1024,
       }),
     });
     if (!response.ok) throw new Error(`OpenAI API error: ${response.statusText}`);

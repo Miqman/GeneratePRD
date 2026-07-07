@@ -334,10 +334,11 @@ Generate 3–4 questions using this priority order:
 ## Question Format Rules
 - Mix question types:
   - OPEN (free text): for target users, core problem, unique context
-  - CHOICE (2–4 options): for who manages vs consumes, scale/reach, monetization
+  - CHOICE (2–4 options, single selection): for scale/reach, primary user, single preference
+  - MULTI-CHOICE (2–5 options, multiple selections allowed): for non-exclusive capabilities, channels, target platforms (e.g. Android, iOS, Web)
 - Keep each question under 15 words (excluding choices).
 - Do NOT ask about things already stated in the description.
-- Write questions in ${lang}.
+- Write questions in \${lang}.
 
 ## Good vs Bad Question Examples
 ❌ "Apa fitur utama yang wajib ada di versi pertama?"
@@ -368,17 +369,22 @@ When vague:
       "type": "open"
     },
     {
-      "text": "Question with choices?",
+      "text": "Question with single choice?",
       "type": "choice",
       "choices": ["Option A", "Option B", "Option C"]
+    },
+    {
+      "text": "Question with multiple choices?",
+      "type": "multi-choice",
+      "choices": ["Platform A", "Platform B", "Platform C"]
     }
   ]
 }
 
 IMPORTANT:
 - Always include "complexity" in every response, even when needsClarification is true. Use your best guess based on what is described so far — it can be refined after clarification answers come in.
-- Every question object MUST have a "type" field ("open" or "choice").
-- Choice questions MUST include a "choices" array.`;
+- Every question object MUST have a "type" field ("open", "choice", or "multi-choice").
+- Choice/multi-choice questions MUST include a "choices" array.`;
 }
 
 /**

@@ -264,7 +264,7 @@ const anthropicProvider: AIProvider = {
       },
       body: JSON.stringify({
         model: process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-20241022",
-        max_tokens: 512,
+        max_tokens: 1024,
         system: CLARIFY_SYSTEM_PROMPT(language),
         messages: [{ role: "user", content: userContent }],
       }),

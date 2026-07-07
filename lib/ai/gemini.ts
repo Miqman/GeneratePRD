@@ -272,7 +272,7 @@ const geminiProvider: AIProvider = {
       body: JSON.stringify({
         system_instruction: { parts: [{ text: CLARIFY_SYSTEM_PROMPT(language) }] },
         contents: [{ parts: [{ text: userContent }] }],
-        generationConfig: { temperature: 0.1, maxOutputTokens: 512 },
+        generationConfig: { temperature: 0.1, maxOutputTokens: 1024 },
       }),
     });
     if (!response.ok) throw new Error(`Gemini API error: ${response.statusText}`);

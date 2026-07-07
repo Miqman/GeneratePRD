@@ -97,9 +97,9 @@ export function PRDStructurePanel({
   }, [activeSection]);
 
   return (
-    <aside className="w-52 shrink-0 border-r border-border/60 bg-card/30 flex flex-col overflow-hidden hidden md:flex">
+    <aside className="flex flex-col overflow-hidden hidden md:flex">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-border/40 shrink-0">
+      <div className="px-4 py-3 shrink-0">
         <div className="flex items-center gap-2">
           <FileText className="w-3.5 h-3.5 text-primary shrink-0" />
           <p className="text-xs font-semibold text-foreground leading-tight">
@@ -119,11 +119,10 @@ export function PRDStructurePanel({
             return (
               <div key={group.id}>
                 <div
-                  className={`w-full text-left transition-all rounded-md px-2.5 py-1.5 flex items-center gap-1 group ${
-                    isActive
-                      ? "bg-primary/12 text-primary"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                  }`}
+                  className={`w-full text-left transition-all rounded-md px-2.5 py-1.5 flex items-center gap-1 group ${isActive
+                    ? "bg-primary/12 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    }`}
                 >
                   {hasChildren ? (
                     <button
@@ -132,9 +131,8 @@ export function PRDStructurePanel({
                       aria-label={isExpanded ? "Collapse" : "Expand"}
                     >
                       <ChevronRight
-                        className={`w-3 h-3 transition-transform duration-200 ${
-                          isExpanded ? "rotate-90" : ""
-                        } ${isActive ? "text-primary/60" : "text-muted-foreground/40"}`}
+                        className={`w-3 h-3 transition-transform duration-200 ${isExpanded ? "rotate-90" : ""
+                          } ${isActive ? "text-primary/60" : "text-muted-foreground/40"}`}
                       />
                     </button>
                   ) : (
@@ -161,11 +159,10 @@ export function PRDStructurePanel({
                           key={child.id}
                           data-section-id={child.id}
                           onClick={() => handleClick(child.anchor)}
-                          className={`w-full text-left transition-all rounded-md pl-7 pr-2.5 py-1 ${
-                            isChildActive
-                              ? "text-primary/80"
-                              : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                          }`}
+                          className={`w-full text-left transition-all rounded-md pl-7 pr-2.5 py-1 ${isChildActive
+                            ? "text-primary/80"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                            }`}
                         >
                           <span className="text-[11px] font-normal leading-snug block">
                             <span className="text-muted-foreground/40 mr-1">—</span>

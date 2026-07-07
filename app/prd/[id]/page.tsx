@@ -228,7 +228,7 @@ export default function PRDEditorPage({
       : session.title;
 
   return (
-    <div className="min-h-screen bg-background text-text-primary flex flex-col font-body-md overflow-hidden">
+    <div className="h-screen bg-background text-text-primary flex flex-col font-body-md overflow-hidden">
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* ─── Navbar ─── */}

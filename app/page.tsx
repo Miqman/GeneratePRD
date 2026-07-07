@@ -36,7 +36,7 @@ type FlowStep = "selectMode" | "input" | "techStack" | "techStackForm" | "clarif
 
 type Question = {
   text: string;
-  type: "open" | "choice";
+  type: "open" | "choice" | "multi-choice";
   choices?: string[];
 };
 
@@ -116,6 +116,8 @@ export default function LandingPage() {
   // Clarify state
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [otherSelected, setOtherSelected] = useState<Record<number, boolean>>({});
+  const [customOtherText, setCustomOtherText] = useState<Record<number, string>>({});
   const [complexity, setComplexity] = useState<"simple" | "medium" | "complex">("medium");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -237,6 +239,8 @@ export default function LandingPage() {
         );
         setQuestions(formattedQuestions);
         setAnswers({});
+        setOtherSelected({});
+        setCustomOtherText({});
         setFlowStep("clarify");
       } else {
         await doGenerate({}, techStack);
@@ -282,7 +286,25 @@ export default function LandingPage() {
     }
   };
 
-  const handleSubmitAnswers = () => doGenerate(answers);
+  const handleSubmitAnswers = () => {
+    const finalAnswers = { ...answers };
+    questions.forEach((q, i) => {
+      if (otherSelected[i]) {
+        const textVal = (customOtherText[i] || "").trim();
+        if (textVal) {
+          if (q.type === "choice") {
+            finalAnswers[q.text] = textVal;
+          } else if (q.type === "multi-choice") {
+            const current = answers[q.text] || "";
+            const list = current ? current.split(", ").map(x => x.trim()).filter(Boolean) : [];
+            list.push(textVal);
+            finalAnswers[q.text] = list.join(", ");
+          }
+        }
+      }
+    });
+    doGenerate(finalAnswers);
+  };
   const handleSkipClarification = () => doGenerate({});
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -702,38 +724,125 @@ export default function LandingPage() {
                     </label>
 
                     {q.type === "choice" && q.choices && q.choices.length > 0 ? (
-                      <div className="flex flex-wrap gap-2 pl-7">
-                        {q.choices.map((choice) => (
+                      <div className="flex flex-col gap-2 pl-7">
+                        <div className="flex flex-wrap gap-2">
+                          {q.choices.map((choice) => {
+                            const isSelected = answers[q.text] === choice && !otherSelected[i];
+                            return (
+                              <button
+                                key={choice}
+                                onClick={() => {
+                                  setOtherSelected((prev) => ({ ...prev, [i]: false }));
+                                  setAnswers((prev) => ({ ...prev, [q.text]: choice }));
+                                }}
+                                className={`text-xs px-3.5 py-1.5 rounded-full border transition-colors cursor-pointer ${
+                                  isSelected
+                                    ? "bg-primary text-on-primary border-primary font-medium shadow-[0_0_10px_rgba(94,237,137,0.2)]"
+                                    : "bg-surface-container text-text-secondary border-border-subtle hover:border-primary/50"
+                                }`}
+                              >
+                                {choice}
+                              </button>
+                            );
+                          })}
                           <button
-                            key={choice}
-                            onClick={() => setAnswers((prev) => ({ ...prev, [q.text]: choice }))}
-                            className={`text-xs px-3.5 py-1.5 rounded-full border transition-colors cursor-pointer ${
-                              answers[q.text] === choice
+                            type="button"
+                            onClick={() => {
+                              setOtherSelected((prev) => ({ ...prev, [i]: true }));
+                              setAnswers((prev) => ({ ...prev, [q.text]: "" }));
+                            }}
+                            className={`text-xs px-3.5 py-1.5 rounded-full border border-dashed transition-colors cursor-pointer ${
+                              otherSelected[i]
                                 ? "bg-primary text-on-primary border-primary font-medium shadow-[0_0_10px_rgba(94,237,137,0.2)]"
                                 : "bg-surface-container text-text-secondary border-border-subtle hover:border-primary/50"
                             }`}
                           >
-                            {choice}
+                            + Lainnya
                           </button>
-                        ))}
+                        </div>
+                        {otherSelected[i] && (
+                          <input
+                            type="text"
+                            placeholder="Masukkan pilihan kustom Anda..."
+                            value={customOtherText[i] || ""}
+                            onChange={(e) =>
+                              setCustomOtherText((prev) => ({ ...prev, [i]: e.target.value }))
+                            }
+                            className="mt-2 w-full max-w-md bg-surface-container text-text-primary text-body-sm px-3 py-2 rounded-lg border border-primary/40 focus:border-primary/60 outline-none focus:ring-1 focus:ring-primary/20"
+                          />
+                        )}
+                      </div>
+                    ) : q.type === "multi-choice" && q.choices && q.choices.length > 0 ? (
+                      <div className="flex flex-col gap-2 pl-7">
+                        <div className="flex flex-wrap gap-2">
+                          {q.choices.map((choice) => {
+                            const current = answers[q.text] || "";
+                            const selectedList = current ? current.split(", ").map(x => x.trim()) : [];
+                            const isSelected = selectedList.includes(choice);
+
+                            return (
+                              <button
+                                key={choice}
+                                onClick={() => {
+                                  setAnswers((prev) => {
+                                    const currentVal = prev[q.text] || "";
+                                    let items = currentVal ? currentVal.split(", ").map(x => x.trim()).filter(Boolean) : [];
+                                    if (items.includes(choice)) {
+                                      items = items.filter((x) => x !== choice);
+                                    } else {
+                                      items.push(choice);
+                                    }
+                                    return { ...prev, [q.text]: items.join(", ") };
+                                  });
+                                }}
+                                className={`text-xs px-3.5 py-1.5 rounded-full border transition-colors cursor-pointer flex items-center gap-1 ${
+                                  isSelected
+                                    ? "bg-primary text-on-primary border-primary font-medium shadow-[0_0_10px_rgba(94,237,137,0.2)]"
+                                    : "bg-surface-container text-text-secondary border-border-subtle hover:border-primary/50"
+                                }`}
+                              >
+                                {isSelected && <Check className="w-3 h-3" />}
+                                {choice}
+                              </button>
+                            );
+                          })}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOtherSelected((prev) => ({ ...prev, [i]: !prev[i] }));
+                            }}
+                            className={`text-xs px-3.5 py-1.5 rounded-full border border-dashed transition-colors cursor-pointer ${
+                              otherSelected[i]
+                                ? "bg-primary text-on-primary border-primary font-medium shadow-[0_0_10px_rgba(94,237,137,0.2)]"
+                                : "bg-surface-container text-text-secondary border-border-subtle hover:border-primary/50"
+                            }`}
+                          >
+                            + Lainnya
+                          </button>
+                        </div>
+                        {otherSelected[i] && (
+                          <input
+                            type="text"
+                            placeholder="Masukkan pilihan kustom tambahan..."
+                            value={customOtherText[i] || ""}
+                            onChange={(e) =>
+                              setCustomOtherText((prev) => ({ ...prev, [i]: e.target.value }))
+                            }
+                            className="mt-2 w-full max-w-md bg-surface-container text-text-primary text-body-sm px-3 py-2 rounded-lg border border-primary/40 focus:border-primary/60 outline-none focus:ring-1 focus:ring-primary/20"
+                          />
+                        )}
                       </div>
                     ) : (
                       <div className="pl-7">
-                        <input
+                        <textarea
                           id={`clarify-q-${i}`}
-                          type="text"
+                          rows={3}
                           value={answers[q.text] ?? ""}
                           onChange={(e) =>
                             setAnswers((prev) => ({ ...prev, [q.text]: e.target.value }))
                           }
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              handleSubmitAnswers();
-                            }
-                          }}
-                          placeholder="Ketik jawaban singkat jika ada..."
-                          className="w-full bg-surface-container text-text-primary text-body-sm px-3 py-2.5 rounded-lg border border-border-subtle focus:border-primary/60 focus:ring-1 focus:ring-primary/20 outline-none transition-all placeholder-text-secondary/50"
+                          placeholder="Ketik jawaban Anda di sini..."
+                          className="w-full bg-surface-container text-text-primary text-body-sm px-3 py-2.5 rounded-lg border border-border-subtle focus:border-primary/60 focus:ring-1 focus:ring-primary/20 outline-none transition-all placeholder-text-secondary/50 resize-y min-h-[80px]"
                         />
                       </div>
                     )}

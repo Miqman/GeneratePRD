@@ -23,12 +23,13 @@ export async function POST(request: NextRequest) {
 
     const raw = await aiProvider.clarify(prompt.trim(), language, techStackContext);
 
-    // Sanitise: strip any accidental markdown code fences the model may add
-    const cleaned = raw
-      .trim()
-      .replace(/^```(?:json)?\s*/i, "")
-      .replace(/\s*```$/i, "")
-      .trim();
+    // Extract the JSON object from the raw output (ignoring code fences or other text)
+    let cleaned = raw.trim();
+    const startIdx = cleaned.indexOf("{");
+    const endIdx = cleaned.lastIndexOf("}");
+    if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+      cleaned = cleaned.slice(startIdx, endIdx + 1);
+    }
 
     let parsed: { needsClarification: boolean; complexity?: "simple" | "medium" | "complex"; questions?: any[] };
     try {
