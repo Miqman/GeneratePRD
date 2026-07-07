@@ -102,6 +102,7 @@ export async function POST(
         goal: f.goal || "",
         doneWhen: f.doneWhen || [],
         subFeatures: f.subFeatures || [],
+        userStories: f.userStories || [],
         icon: f.icon || "Layers",
         status: "planned",
         order: i,

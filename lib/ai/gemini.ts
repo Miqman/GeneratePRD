@@ -1,5 +1,4 @@
 import type { AIProvider } from "./provider";
-import { truncatePRDForChat } from "./provider";
 import type { AgenticChatResult } from "../types";
 import { AGENTIC_CHAT_SYSTEM_PROMPT } from "../prd-prompt";
 
@@ -73,104 +72,6 @@ const geminiProvider: AIProvider = {
     return data.candidates[0].content.parts[0].text;
   },
 
-  async chatPRD(
-    currentPRD: string,
-    message: string,
-    language: "id" | "en"
-  ): Promise<string> {
-    const { CHAT_SYSTEM_PROMPT } = await import("@/lib/prd-prompt");
-    const truncatedPRD = truncatePRDForChat(currentPRD);
-    const model = process.env.GEMINI_MODEL || "gemini-1.5-pro";
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: {
-          parts: [{ text: CHAT_SYSTEM_PROMPT(language) }],
-        },
-        contents: [
-          {
-            parts: [
-              {
-                text: `Current PRD:\n\n${truncatedPRD}\n\n---\n\nUser message: ${message}`,
-              },
-            ],
-          },
-        ],
-        generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data.candidates[0].content.parts[0].text;
-  },
-
-  async chatPRDStream(
-    currentPRD: string,
-    message: string,
-    language: "id" | "en"
-  ): Promise<ReadableStream<string>> {
-    const { CHAT_SYSTEM_PROMPT } = await import("@/lib/prd-prompt");
-    const truncatedPRD = truncatePRDForChat(currentPRD);
-    const model = process.env.GEMINI_MODEL || "gemini-1.5-pro";
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${process.env.GEMINI_API_KEY}`;
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: {
-          parts: [{ text: CHAT_SYSTEM_PROMPT(language) }],
-        },
-        contents: [
-          {
-            parts: [
-              {
-                text: `Current PRD:\n\n${truncatedPRD}\n\n---\n\nUser message: ${message}`,
-              },
-            ],
-          },
-        ],
-        generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.statusText}`);
-    }
-
-    // Parse Gemini SSE stream (data: {candidates:[{content:{parts:[{text}]}}]})
-    const reader = response.body!.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    return new ReadableStream<string>({
-      async pull(controller) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) { controller.close(); return; }
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
-          for (const line of lines) {
-            const t = line.trim();
-            if (!t.startsWith("data: ")) continue;
-            try {
-              const p = JSON.parse(t.slice(6));
-              const text = p.candidates?.[0]?.content?.parts?.[0]?.text;
-              if (text) { controller.enqueue(text); return; }
-            } catch { /* skip */ }
-          }
-        }
-      },
-    });
-  },
 
   async agenticChat(
     currentPRD: string,

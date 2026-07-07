@@ -1,5 +1,4 @@
 import type { AIProvider } from "./provider";
-import { truncatePRDForChat } from "./provider";
 import type { AgenticChatResult } from "../types";
 import { AGENTIC_CHAT_SYSTEM_PROMPT, AGENTIC_UPDATE_PRD_TOOL, parseAgenticResponse } from "../prd-prompt";
 
@@ -111,75 +110,6 @@ const openaiProvider: AIProvider = {
     return data.choices[0].message.content;
   },
 
-  async chatPRD(
-    currentPRD: string,
-    message: string,
-    language: "id" | "en"
-  ): Promise<string> {
-    const { CHAT_SYSTEM_PROMPT } = await import("@/lib/prd-prompt");
-    const truncatedPRD = truncatePRDForChat(currentPRD);
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || "gpt-4o",
-        messages: [
-          { role: "system", content: CHAT_SYSTEM_PROMPT(language) },
-          {
-            role: "user",
-            content: `Current PRD:\n\n${truncatedPRD}\n\n---\n\nUser message: ${message}`,
-          },
-        ],
-        temperature: 0.7,
-        max_tokens: 1024,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data.choices[0].message.content;
-  },
-
-  async chatPRDStream(
-    currentPRD: string,
-    message: string,
-    language: "id" | "en"
-  ): Promise<ReadableStream<string>> {
-    const { CHAT_SYSTEM_PROMPT } = await import("@/lib/prd-prompt");
-    const truncatedPRD = truncatePRDForChat(currentPRD);
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || "gpt-4o",
-        messages: [
-          { role: "system", content: CHAT_SYSTEM_PROMPT(language) },
-          {
-            role: "user",
-            content: `Current PRD:\n\n${truncatedPRD}\n\n---\n\nUser message: ${message}`,
-          },
-        ],
-        temperature: 0.7,
-        max_tokens: 1024,
-        stream: true,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.statusText}`);
-    }
-
-    return openAIStreamToReadable(response);
-  },
 
   async agenticChat(
     currentPRD: string,

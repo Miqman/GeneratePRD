@@ -61,7 +61,8 @@ export const prdFeatures = pgTable("prd_features", {
   description: text("description").notNull(), // 1–2 kalimat
   goal: text("goal").notNull(),              // tujuan fitur
   doneWhen: jsonb("done_when").notNull(),    // string[]
-  subFeatures: jsonb("sub_features").notNull(), // { name, description }[]
+  subFeatures: jsonb("sub_features").notNull(), // { name, description, goal?, doneWhen? }[]
+  userStories: jsonb("user_stories"),            // string[] | null — "As a X, I want Y, so that Z"
   icon: text("icon").default("Layers"),      // lucide icon name
   status: text("status").notNull().default("planned"), // "planned" | "in_progress" | "done"
   order: integer("order").notNull().default(0),

@@ -98,6 +98,14 @@ export interface TechStackFormData {
 export interface SubFeature {
   name: string;
   description: string;
+  goal?: string;       // tujuan spesifik sub-fitur
+  doneWhen?: string[]; // kriteria selesai sub-fitur
+}
+
+export interface UserStory {
+  actor: string;   // "Customer", "Admin", "Pengguna", dll
+  action: string;  // apa yang ingin dilakukan
+  benefit: string; // manfaat yang didapat
 }
 
 export interface RoadmapFeature {
@@ -110,6 +118,7 @@ export interface RoadmapFeature {
   goal: string;
   doneWhen: string[];
   subFeatures: SubFeature[];
+  userStories?: UserStory[]; // 3-5 user stories per fitur
   icon: string;            // lucide icon name
   status: "planned" | "in_progress" | "done";
   order: number;
