@@ -122,8 +122,9 @@ async function generateRoadmapBackground(
       const cleaned = rawJson.replace(/^```json\n?/, "").replace(/\n?```$/, "").trim();
       featuresData = JSON.parse(cleaned);
       if (!Array.isArray(featuresData)) throw new Error("Expected array");
-    } catch {
-      console.error("Roadmap: invalid JSON from AI");
+    } catch (parseError) {
+      console.error("Roadmap background JSON parsing failed. Raw response was:", rawJson);
+      console.error("Parsing error details:", parseError);
       return;
     }
 
