@@ -76,8 +76,9 @@ export async function POST(
     // Parse AI response
     let featuresData: RoadmapFeature[];
     try {
-      const cleaned = rawJson.replace(/^```json\n?/, "").replace(/\n?```$/, "").trim();
-      featuresData = JSON.parse(cleaned);
+      const match = rawJson.match(/\[[\s\S]*\]/);
+      if (!match) throw new Error("No array found in response");
+      featuresData = JSON.parse(match[0]);
       if (!Array.isArray(featuresData)) throw new Error("Expected array");
     } catch (parseError) {
       console.error("Roadmap JSON parsing failed. Raw response was:", rawJson);

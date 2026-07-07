@@ -15,55 +15,54 @@ const BASE_URL =
   process.env.NINEROUTER_BASE_URL || "https://api.9router.com/v1";
 const API_KEY = process.env.NINEROUTER_API_KEY || "";
 const MODEL = process.env.NINEROUTER_MODEL || "gpt-4o";
+const TIMEOUT_MS = 120_000; // 120s —9router perlu waktu connect ke upstream model
 
-async function chatCompletion(
-  systemPrompt: string,
-  userContent: string,
-  maxTokens = 4096
-): Promise<string> {
-  const response = await fetch(`${BASE_URL}/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userContent },
-      ],
-      temperature: 0.7,
-      max_tokens: maxTokens,
-      stream: false, // paksa non-streaming agar response berupa JSON biasa
-    }),
-  });
+async function fetchJSON(
+  label: string,
+  body: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
-  if (!response.ok) {
-    const errorBody = await response.text().catch(() => response.statusText);
-    throw new Error(`9router API error [${response.status}]: ${errorBody}`);
+  try {
+    const response = await fetch(`${BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text().catch(() => response.statusText);
+      throw new Error(`[${response.status}]: ${errorBody}`);
+    }
+
+    return await response.json();
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error(`9router ${label}: timeout after ${TIMEOUT_MS / 1000}s — upstream model unreachable`);
+    }
+    throw err instanceof Error
+      ? new Error(`9router ${label}: ${err.message}`)
+      : err;
+  } finally {
+    clearTimeout(timeoutId);
   }
+}
 
-  const data = await response.json();
-
-  // Support both OpenAI-style and possible custom response shapes
+function extractContent(data: Record<string, unknown>): string {
   const content =
-    data?.choices?.[0]?.message?.content ??
-    data?.choices?.[0]?.text ??
-    data?.content ??
-    data?.text;
+    (data as any)?.choices?.[0]?.message?.content ??
+    (data as any)?.choices?.[0]?.text ??
+    (data as any)?.content ??
+    (data as any)?.text;
 
   if (!content) {
-    const finishReason = data?.choices?.[0]?.finish_reason ?? "unknown";
-    const usage = data?.usage ?? {};
-    console.error(
-      "[9router] Empty response. finish_reason:",
-      finishReason,
-      "| usage:",
-      JSON.stringify(usage),
-      "| response keys:",
-      Object.keys(data || {})
-    );
+    const finishReason = (data as any)?.choices?.[0]?.finish_reason ?? "unknown";
+    console.error("[9router] Empty response. finish_reason:", finishReason);
     throw new Error(
       `9router: No content in AI response (finish_reason: ${finishReason}). The PRD may be too large for the model's context window.`
     );
@@ -75,21 +74,34 @@ async function chatCompletion(
 const ninerouterProvider: AIProvider = {
   async generatePRD(prompt: string, language: "id" | "en", complexity?: "simple" | "medium" | "complex"): Promise<string> {
     const { PRD_SYSTEM_PROMPT } = await import("@/lib/prd-prompt");
-    // PRD lengkap butuh token besar — gunakan max yang didukung model
-    return chatCompletion(PRD_SYSTEM_PROMPT(language, complexity), prompt, 8192);
+    const data = await fetchJSON("generatePRD", {
+      model: MODEL,
+      messages: [
+        { role: "system", content: PRD_SYSTEM_PROMPT(language, complexity) },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.7,
+      max_tokens: 8192,
+      stream: false,
+    });
+    return extractContent(data);
   },
 
-  async revisePRD(
-    currentPRD: string,
-    instruction: string,
-    language: "id" | "en"
-  ): Promise<string> {
+  async revisePRD(currentPRD: string, instruction: string, language: "id" | "en"): Promise<string> {
     const { REVISE_SYSTEM_PROMPT } = await import("@/lib/prd-prompt");
     const userContent = `PRD saat ini:\n\n${currentPRD}\n\n---\n\nInstruksi revisi: ${instruction}`;
-    // Revisi juga perlu token besar karena mengembalikan PRD lengkap
-    return chatCompletion(REVISE_SYSTEM_PROMPT(language), userContent, 8192);
+    const data = await fetchJSON("revisePRD", {
+      model: MODEL,
+      messages: [
+        { role: "system", content: REVISE_SYSTEM_PROMPT(language) },
+        { role: "user", content: userContent },
+      ],
+      temperature: 0.7,
+      max_tokens: 8192,
+      stream: false,
+    });
+    return extractContent(data);
   },
-
 
   async agenticChat(
     currentPRD: string,
@@ -98,35 +110,19 @@ const ninerouterProvider: AIProvider = {
   ): Promise<AgenticChatResult> {
     const systemPrompt = AGENTIC_CHAT_SYSTEM_PROMPT(language);
     const prdContext = `Current PRD:\n\n${currentPRD}`;
-    const fullMessages = [
-      { role: "system", content: systemPrompt },
-      { role: "system", content: prdContext },
-      ...messages,
-    ];
-
-    const response = await fetch(`${BASE_URL}/chat/completions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: fullMessages,
-        tools: [AGENTIC_UPDATE_PRD_TOOL],
-        tool_choice: "auto",
-        temperature: 0.7,
-        max_tokens: 2048,
-        stream: false,
-      }),
+    const data = await fetchJSON("agenticChat", {
+      model: MODEL,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "system", content: prdContext },
+        ...messages,
+      ],
+      tools: [AGENTIC_UPDATE_PRD_TOOL],
+      tool_choice: "auto",
+      temperature: 0.7,
+      max_tokens: 2048,
+      stream: false,
     });
-
-    if (!response.ok) {
-      const errorBody = await response.text().catch(() => response.statusText);
-      throw new Error(`9router API error [${response.status}]: ${errorBody}`);
-    }
-
-    const data = await response.json();
     const parsed = parseAgenticResponse(data);
 
     if (parsed.type === "text") {
@@ -142,63 +138,34 @@ const ninerouterProvider: AIProvider = {
 
   async clarify(prompt: string, language: "id" | "en", techStack?: string): Promise<string> {
     const { CLARIFY_SYSTEM_PROMPT } = await import("@/lib/prd-prompt");
-    // Use lower temperature for deterministic JSON output
     const userContent = techStack
       ? `Product description:\n${prompt}\n\nTech stack already chosen by user:\n${techStack}`
       : prompt;
-    const response = await fetch(`${BASE_URL}/chat/completions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [
-          { role: "system", content: CLARIFY_SYSTEM_PROMPT(language) },
-          { role: "user", content: userContent },
-        ],
-        temperature: 0.1,
-        max_tokens: 1024,
-        stream: false,
-      }),
+    const data = await fetchJSON("clarify", {
+      model: MODEL,
+      messages: [
+        { role: "system", content: CLARIFY_SYSTEM_PROMPT(language) },
+        { role: "user", content: userContent },
+      ],
+      temperature: 0.1,
+      max_tokens: 1024,
+      stream: false,
     });
-    if (!response.ok) {
-      const err = await response.text().catch(() => response.statusText);
-      throw new Error(`9router clarify error [${response.status}]: ${err}`);
-    }
-    const data = await response.json();
-    return (
-      data?.choices?.[0]?.message?.content ?? data?.content ?? data?.text ?? "{}"
-    );
+    return extractContent(data);
   },
 
   async generateText(systemPrompt: string, userContent: string): Promise<string> {
-    const response = await fetch(`${BASE_URL}/chat/completions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userContent },
-        ],
-        temperature: 0.3,
-        max_tokens: 8192,
-        stream: false,
-      }),
+    const data = await fetchJSON("generateText", {
+      model: MODEL,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userContent },
+      ],
+      temperature: 0.3,
+      max_tokens: 8192,
+      stream: false,
     });
-    if (!response.ok) {
-      const err = await response.text().catch(() => response.statusText);
-      throw new Error(`9router generateText error [${response.status}]: ${err}`);
-    }
-    const data = await response.json();
-    return (
-      data?.choices?.[0]?.message?.content ?? data?.content ?? data?.text ?? ""
-    );
+    return extractContent(data);
   },
 };
 
